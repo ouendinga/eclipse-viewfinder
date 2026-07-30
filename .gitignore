@@ -1,0 +1,8 @@
+# datos pesados y derivados: se reconstruyen con `eclipseview setup`
+data/
+reports/
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.DS_Store
