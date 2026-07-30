@@ -1,0 +1,330 @@
+# -*- coding: utf-8 -*-
+"""The Spain-wide overview report.
+
+Spanish only, on purpose: this one is an essay about a specific country's terrain,
+not a template. The parameterised, translatable report is `report.render_place`.
+
+Every figure is computed here and interpolated into the prose. Cloud statistics are
+the one exception and are rendered from `sources.CLIMATOLOGY` with the attribution
+attached, because we cannot derive them from ephemerides and elevation.
+"""
+import json
+import os
+
+import numpy as np
+
+from . import i18n, roster, sources, verify
+from .analysis import evaluate, km, path_limits, zone_stats
+from .paths import MAP_SVG, SCAN_PKL
+from .report import esc, _num, _margin_class, _td_class, site_note
+from .style import CSS
+
+LANG = 'es'
+D = lambda v, s=True: i18n.deg(LANG, v, 2, s)        # noqa: E731
+N = lambda v, d=0: i18n.number(LANG, v, d)           # noqa: E731
+
+
+def build(progress=None, zone_half_km=9.0, zone_n=13):
+    """Compute everything the overview needs. Returns a dict of results."""
+    origin = roster.LADDER_ORIGIN
+    sites = {}
+    total = len(roster.SITES)
+    for i, s in enumerate(roster.SITES, 1):
+        if progress:
+            progress(i, total, s['label'])
+        row = evaluate(s['lat'], s['lon'], label=s['label'])
+        row.update(key=s['key'], tier=s['tier'], role=s['role'],
+                   hero=s.get('hero', False), warn=s.get('warn', False))
+        row['dist'] = float(km(row['lat'], row['lon'], origin['lat'], origin['lon']))
+        zl, zo, zh = s['zone']
+        row['zone'] = zone_stats(zl, zo, half_km=zh or zone_half_km, n=zone_n)
+        sites[s['key']] = row
+
+    scan = None
+    if os.path.exists(SCAN_PKL):
+        import pickle
+        d = pickle.load(open(SCAN_PKL, 'rb'))
+        clear = d['clear']
+        scan = dict(n=int(clear.size),
+                    blocked=float((clear < 0).mean()),
+                    alt_min=float(np.nanmin(d['a_c3'])),
+                    alt_max=float(np.nanmax(d['a_c2'])),
+                    az_min=float(np.nanmin(d['z_c2'])),
+                    az_max=float(np.nanmax(d['z_c3'])),
+                    dur_max=float(np.nanmax(d['dur'])))
+    lim = path_limits()
+    checks = verify.run_all()
+    return dict(sites=sites, scan=scan, limits=lim, checks=checks,
+                summary=verify.summarise(checks), origin=origin)
+
+
+# ------------------------------------------------------------------ rendering
+
+def _site_card(r):
+    cl = r['clear']
+    z = r['zone']
+    badge, bcls = ('TOTALIDAD', 'g') if r['total'] else (
+        f"{N(r['obsc'], 1)}% parcial", 'w' if cl >= 2 else 'b')
+    if r['warn']:
+        bcls = 'b'
+        badge = 'BLOQUEADO' if cl < 0 else 'MUY JUSTO'
+    nums = [
+        _num('coordenadas', f"{N(r['lat'], 4)}, {N(r['lon'], 4)}"),
+        _num('altitud', f"{r['elev']} m"),
+        _num('totalidad', f"{N(r['dur'], 0)} s" if r['total'] else '—'),
+        _num('sol al final', i18n.deg(LANG, r['alt'], 2), 'hi'),
+        _num('horizonte real', D(r['horizon'])),
+        _num('margen libre', D(cl), _margin_class(cl)),
+        _num('hora (CEST)', (r['c2_local'] or r['max_local'])[:5]),
+        _num('desde Barcelona', f"{N(r['dist'], 0)} km"),
+    ]
+    if z:
+        nums.append(_num('zona apta', f"{N(z['frac_ok'] * 100, 0)}%"))
+    zone_txt = ''
+    if z:
+        zone_txt = (f" En un cuadrado de {N(z['half_km'] * 2, 0)} km alrededor, "
+                    f"<b>{N(z['frac_ok'] * 100, 1)}%</b> del terreno mantiene más de "
+                    f"{D(z['threshold'])} de margen (mediana {D(z['median'])}, "
+                    f"peor punto {D(z['worst'])}).")
+    klass = ' hero' if r['hero'] else (' bad' if r['warn'] else '')
+    return f'''
+<article class="site{klass}">
+  <div class="site-h">
+    <h3>{esc(r['label'])}</h3>
+    <span class="place">{esc(r.get('place') or '')}</span>
+    <span class="badge {bcls}">{badge}</span>
+  </div>
+  <div class="nums">{''.join(nums)}</div>
+  <div class="panowrap">{r['svg']}</div>
+  <div class="why">{esc(r['role'])}{zone_txt} {site_note(r, LANG)}</div>
+</article>'''
+
+
+def _ladder(sites):
+    rows = []
+    for key in roster.LADDER:
+        r = sites.get(key)
+        if not r:
+            continue
+        rows.append(
+            f"<tr><td>{esc(r['label'])}</td><td>{N(r['dist'], 0)}</td>"
+            f"<td>{N(r['dur'], 0) + ' s' if r['total'] else '—'}</td>"
+            f"<td>{i18n.deg(LANG, r['alt'], 1)}</td>"
+            f"<td class=\"{_td_class(r['clear'])}\">{D(r['clear'])}</td>"
+            f"<td>{N(r['zone']['frac_ok'] * 100, 0) + '%' if r['zone'] else '—'}</td>"
+            f"</tr>")
+    return ('<div class="tablewrap"><table><thead><tr><th>sitio</th>'
+            '<th>km desde Barcelona</th><th>totalidad</th><th>sol</th>'
+            '<th>margen</th><th>zona apta</th></tr></thead><tbody>'
+            + ''.join(rows) + '</tbody></table></div>')
+
+
+def _full_table(sites):
+    rows = []
+    for r in sorted(sites.values(), key=lambda x: (-x['total'], -x['clear'])):
+        z = r['zone']
+        rows.append(
+            f"<tr><td>{esc(r['label'])}</td>"
+            f"<td>{N(r['lat'], 4)}, {N(r['lon'], 4)}</td><td>{r['elev']}</td>"
+            f"<td>{N(r['dur'], 0) if r['total'] else '—'}</td>"
+            f"<td>{N(r['obsc'], 2)}%</td>"
+            f"<td>{i18n.deg(LANG, r['alt'], 2)}</td>"
+            f"<td>{i18n.deg(LANG, r['az'], 1)}</td>"
+            f"<td>{D(r['horizon'])}</td>"
+            f"<td class=\"{_td_class(r['clear'])}\">{D(r['clear'])}</td>"
+            f"<td>{N(z['frac_ok'] * 100, 0) + '%' if z else '—'}</td>"
+            f"<td>{N(r['dist'], 0)}</td></tr>")
+    return ('<div class="tablewrap"><table><thead><tr><th>sitio</th>'
+            '<th>lat, lon</th><th>m</th><th>totalidad s</th><th>sol oculto</th>'
+            '<th>altura sol</th><th>azimut</th><th>horizonte</th><th>margen</th>'
+            '<th>zona apta</th><th>km BCN</th></tr></thead><tbody>'
+            + ''.join(rows) + '</tbody></table></div>')
+
+
+def _climatology():
+    c = sources.CLIMATOLOGY
+    items = ''.join(
+        f"<tr><td>{esc(r['label'])}</td><td style=\"text-align:left;"
+        f"font-family:var(--sans);white-space:normal\">{esc(r['rating'])}</td>"
+        f"<td style=\"text-align:left;font-family:var(--sans);white-space:normal;"
+        f"color:var(--muted)\">{esc(r['text'])}</td></tr>"
+        for r in c['regions'])
+    return f'''
+<section>
+  <p class="eyebrow">Dato externo, no calculado por mí</p>
+  <h2>Dónde suele estar despejado</h2>
+  <p class="prose">Esto no sale de las efemérides ni del relieve: es
+  <b>climatología publicada</b> de agosto. La incluyo porque sin ella el análisis de
+  terreno te puede mandar al sitio con el mejor horizonte y las peores nubes.</p>
+  <div class="tablewrap"><table><thead><tr><th>zona</th><th>pronóstico</th>
+  <th>qué dice la fuente</th></tr></thead><tbody>{items}</tbody></table></div>
+  <p class="caption">{esc(c['note'])} Fuente: {sources.cite(c['source'])}.</p>
+  <div class="note">{esc(c['low_sun_warning'])}</div>
+</section>'''
+
+
+def _verification(checks, summary):
+    rows = []
+    for g in checks:
+        for it in g['items']:
+            ok = '✓' if it['ok'] else '✗'
+            cls = 'g' if it['ok'] else 'b'
+            src = g.get('source')
+            src_html = sources.cite(src) if src in sources.CITATIONS else esc(
+                g.get('source_url') or src or '')
+            rows.append(
+                f"<tr><td>{esc(g['name'])} — {esc(it['what'])}</td>"
+                f"<td>{esc(it['ours'])} {esc(it['unit'])}</td>"
+                f"<td>{esc(it['published'])} {esc(it['unit'])}</td>"
+                f"<td class=\"{cls}\">{ok}</td>"
+                f"<td style=\"text-align:left;font-family:var(--sans);"
+                f"white-space:normal;color:var(--muted)\">{src_html}</td></tr>")
+    return f'''
+<section>
+  <h2>Cómo sé que esto no me lo estoy inventando</h2>
+  <p class="prose">Esta tabla no está escrita a mano: se calcula cada vez que se
+  genera el informe, comparando el motor con valores publicados y con cálculos
+  analíticos. Ahora mismo pasan
+  <b>{summary['passed']} de {summary['total']}</b>.</p>
+  <div class="tablewrap"><table><thead><tr><th>comprobación</th><th>calculado</th>
+  <th>publicado</th><th>ok</th><th>fuente</th></tr></thead><tbody>
+  {''.join(rows)}</tbody></table></div>
+</section>'''
+
+
+def render(data):
+    s = data['sites']
+    scan = data['scan']
+    lim = data['limits']
+
+    alt_hi = max(r['alt_start'] for r in s.values())
+    alt_lo = min(r['alt'] for r in s.values())
+    az_lo = min(r['az'] for r in s.values())
+    az_hi = max(r['az'] for r in s.values())
+    best_dur = max((r['dur'] for r in s.values() if r['total']), default=0)
+    scanned = f"{scan['n']:,}".replace(',', '.') if scan else '—'
+    blocked_pct = N(scan['blocked'] * 100, 1) + '%' if scan else '—'
+
+    tiers = ''
+    for t in roster.TIERS:
+        cards = ''.join(_site_card(r) for r in
+                        sorted((x for x in s.values() if x['tier'] == t['key']),
+                               key=lambda x: -x['clear']))
+        if not cards:
+            continue
+        tiers += (f'<section><p class="eyebrow">{esc(t["eyebrow"])}</p>'
+                  f'<h2>{esc(t["title"])}</h2>'
+                  f'<p class="prose">{esc(t["intro"])}</p>{cards}</section>')
+
+    others = ''.join(
+        f"<li><b>{esc(o['date'])}</b> — {esc(o['kind'])} sobre {esc(o['where'])}: "
+        f"{esc(o['headline'])} ({sources.cite(o['source'])}).</li>"
+        for o in sources.OTHER_ECLIPSES)
+
+    map_svg = open(MAP_SVG).read() if os.path.exists(MAP_SVG) else ''
+    width_txt = (f"entre {N(lim['width_min'], 0)} y {N(lim['width_max'], 0)} km "
+                 f"({N(lim['width_mean'], 0)} km de media)") if lim else '—'
+
+    body = f'''
+<header class="top">
+  <p class="eyebrow">{esc(sources.EVENT['name'])} · análisis de terreno</p>
+  <h1>El sitio no lo decide el pueblo.<br>Lo decide el horizonte.</h1>
+  <p class="lede">Durante la totalidad el Sol estará entre
+  <b>{i18n.deg(LANG, alt_lo, 1)} y {i18n.deg(LANG, alt_hi, 1)}</b> sobre el horizonte,
+  en el azimut <b>{i18n.deg(LANG, az_lo, 0)}–{i18n.deg(LANG, az_hi, 0)}</b>
+  (oeste-noroeste). A esa altura, una loma a 3 km o una sierra a 80 km se lo come.
+  He calculado la geometría del eclipse y el perfil real del terreno en esa dirección
+  para <b>{scanned} puntos</b> de la franja.</p>
+</header>
+
+<section>
+  <h2>Lo esencial</h2>
+  <div class="facts">
+    <div class="fact"><div class="k">Duración máxima</div>
+      <div class="v">{N(best_dur, 0)} s</div>
+      <div class="n">de los sitios analizados, en la línea central</div></div>
+    <div class="fact"><div class="k">Altura del Sol</div>
+      <div class="v">{i18n.deg(LANG, alt_hi, 0)} → {i18n.deg(LANG, alt_lo, 0)}</div>
+      <div class="n">de Asturias a Baleares. Cuanto más al este, más bajo</div></div>
+    <div class="fact"><div class="k">Azimut</div>
+      <div class="v">{i18n.deg(LANG, az_lo, 0)} → {i18n.deg(LANG, az_hi, 0)}</div>
+      <div class="n">hacia dónde mirar: ONO, no el oeste exacto</div></div>
+    <div class="fact"><div class="k">Terreno que estorba</div>
+      <div class="v">{blocked_pct}</div>
+      <div class="n">de la franja tiene el Sol tapado por el relieve</div></div>
+    <div class="fact"><div class="k">Anchura de la sombra</div>
+      <div class="v">{N(lim['width_mean'], 0) if lim else '—'} km</div>
+      <div class="n">sobre España, resuelta por bisección</div></div>
+    <div class="fact"><div class="k">Verificación</div>
+      <div class="v">{data['summary']['passed']}/{data['summary']['total']}</div>
+      <div class="n">comprobaciones contra NASA, IGN y cálculo analítico</div></div>
+  </div>
+  <div class="note">
+    <b>Hay más eclipses, y el que viene es mucho más fácil.</b>
+    <ul>{others}</ul>
+    El de 2026 es el difícil de los tres: también el más fotogénico, porque la corona
+    sale junto al paisaje y no en lo alto del cielo.
+  </div>
+</section>
+
+<section>
+  <h2>Dónde cae la franja</h2>
+  <div class="mapbox">{map_svg}</div>
+  <div class="legendrow">
+    <span><i style="background:#ff9b3d"></i>línea central</span>
+    <span><i style="background:#ffd9a0"></i>franja de totalidad</span>
+    <span><i style="background:#8ce99a"></i>buen margen</span>
+    <span><i style="background:#ffe066"></i>aceptable</span>
+    <span><i style="background:#ff5c5c"></i>bloqueado</span>
+  </div>
+  <p class="caption">Relieve dibujado con el mismo modelo de elevación
+  ({sources.cite('srtm')}) que uso para los cálculos. Los bordes los he resuelto por
+  bisección con el motor de eclipses, no interpolando: sobre España la sombra mide
+  <b>{width_txt}</b>.</p>
+</section>
+
+<section>
+  <h2>Qué compra cada hora de coche</h2>
+  <p class="prose">Cuanto más al oeste, más alto está el Sol, más dura la totalidad y
+  más perdona el terreno. La columna que de verdad importa es <b>zona apta</b>: qué
+  porcentaje del entorno mantiene margen suficiente, o sea cuánto perdona el sitio si
+  no aciertas con el punto exacto.</p>
+  {_ladder(s)}
+</section>
+
+{tiers}
+
+<section>
+  <h2>Todo junto</h2>
+  {_full_table(s)}
+  <p class="caption"><b>margen</b> = grados entre el Sol y el terreno real durante
+  todo el evento (negativo = el Sol se pone antes). <b>zona apta</b> = porcentaje del
+  entorno que mantiene más de {D(2.0)} de margen. Distancias en línea recta desde
+  Barcelona; por carretera, cuenta aproximadamente un 25 % más.</p>
+</section>
+
+{_climatology()}
+
+{_verification(data['checks'], data['summary'])}
+
+<section>
+  <h2>Límites conocidos</h2>
+  <div class="note warn">
+    El modelo de elevación no ve <b>árboles, edificios ni naves</b>: por eso pido
+    margen y no 0°. Las duraciones llevan un sesgo sistemático de <b>+2–3 %</b>
+    frente al IGN por el convenio de radio lunar, así que tómalas como ±3 s; para
+    horarios oficiales, el {sources.cite('ign')}. La refracción cerca del horizonte
+    varía con la temperatura y puede mover el terreno lejano una o dos décimas de
+    grado. Los porcentajes de nubosidad son climatología, <b>no un pronóstico</b>.
+    Y las coordenadas son puntos del terreno, no de acceso: comprueba que se llega y
+    que no estás en finca privada.
+  </div>
+</section>'''
+
+    return f'''<title>Eclipse del 12 de agosto de 2026: dónde ponerse</title>
+<style>{CSS}</style>
+<div class="wrap">{body}
+<footer><p>Efemérides {sources.cite('de421')} · relieve {sources.cite('srtm')} ·
+topónimos {sources.cite('osm')} · contraste con {sources.cite('ign')} y
+{sources.cite('nasa_gsfc')}. Hora peninsular = UTC+2.</p></footer>
+</div>'''
