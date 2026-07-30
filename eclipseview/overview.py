@@ -40,6 +40,12 @@ def build(progress=None, zone_half_km=9.0, zone_n=13):
         row['zone'] = zone_stats(zl, zo, half_km=zh or zone_half_km, n=zone_n)
         sites[s['key']] = row
 
+    # Fail loudly: without the band-wide scan the headline silently renders em-dashes
+    # instead of figures, which looks like a design choice rather than missing data.
+    if not os.path.exists(SCAN_PKL):
+        raise FileNotFoundError(
+            f'Falta {SCAN_PKL}. El informe general necesita el barrido de la franja.\n'
+            f'Ejecuta:  python -c "from eclipseview import scan; scan.main()"')
     scan = None
     if os.path.exists(SCAN_PKL):
         import pickle
@@ -64,7 +70,8 @@ def _site_card(r):
     cl = r['clear']
     z = r['zone']
     badge, bcls = ('TOTALIDAD', 'g') if r['total'] else (
-        f"{N(r['obsc'], 1)}% parcial", 'w' if cl >= 2 else 'b')
+        f"{i18n.obscuration(LANG, r['obsc'], False)} parcial",
+        'w' if cl >= 2 else 'b')
     if r['warn']:
         bcls = 'b'
         badge = 'BLOQUEADO' if cl < 0 else 'MUY JUSTO'
@@ -127,7 +134,7 @@ def _full_table(sites):
             f"<tr><td>{esc(r['label'])}</td>"
             f"<td>{N(r['lat'], 4)}, {N(r['lon'], 4)}</td><td>{r['elev']}</td>"
             f"<td>{N(r['dur'], 0) if r['total'] else '—'}</td>"
-            f"<td>{N(r['obsc'], 2)}%</td>"
+            f"<td>{i18n.obscuration(LANG, r['obsc'], r['total'])}</td>"
             f"<td>{i18n.deg(LANG, r['alt'], 2)}</td>"
             f"<td>{i18n.deg(LANG, r['az'], 1)}</td>"
             f"<td>{D(r['horizon'])}</td>"

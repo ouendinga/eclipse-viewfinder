@@ -58,7 +58,7 @@ def site_note(row, lang, min_clear=1.5):
                        dur=dur)
     else:
         note += i18n.t(lang, 'note_partial',
-                       obsc=f"{i18n.number(lang, row['obsc'], 2)}%")
+                       obsc=i18n.obscuration(lang, row['obsc'], False))
     return note
 
 
@@ -71,6 +71,7 @@ def render_place(origin, radius_km, rows, min_clear, lang='es', event=None,
     ev = event or events.DEFAULT
     tz = ev.tz_label
     place = origin['label']
+    place_full = origin.get('full') or place
     dd = lambda v, s=True: i18n.deg(lang, v, 2, s)          # noqa: E731
 
     if not rows:
@@ -89,7 +90,7 @@ def render_place(origin, radius_km, rows, min_clear, lang='es', event=None,
             f'<td>{i18n.number(lang, r["lat"], 4)}, {i18n.number(lang, r["lon"], 4)}</td>'
             f'<td>{r["elev"]}</td>'
             f'<td>{i18n.number(lang, r["dist"], 1)}</td>'
-            f'<td>{i18n.number(lang, r["obsc"], 2)}%</td>'
+            f'<td>{i18n.obscuration(lang, r["obsc"], r["total"])}</td>'
             f'<td>{"—" if not r["total"] else i18n.number(lang, r["dur"], 0) + " s"}</td>'
             f'<td>{i18n.deg(lang, r["alt"], 2)}</td>'
             f'<td>{dd(r["horizon"])}</td>'
@@ -99,7 +100,7 @@ def render_place(origin, radius_km, rows, min_clear, lang='es', event=None,
     for r in rows:
         badge = (i18n.t(lang, 'badge_total') if r['total']
                  else i18n.t(lang, 'badge_partial',
-                             pct=f'{i18n.number(lang, r["obsc"], 1)}%'))
+                             pct=i18n.obscuration(lang, r['obsc'], False)))
         bcls = 'g' if r['total'] else ('w' if r['clear'] >= 2 else 'b')
         head = esc(r.get('label') or r.get('place') or
                    f'{r["lat"]:.4f}, {r["lon"]:.4f}')
@@ -108,7 +109,8 @@ def render_place(origin, radius_km, rows, min_clear, lang='es', event=None,
                  f'{i18n.number(lang, r["lat"], 4)}, {i18n.number(lang, r["lon"], 4)}'),
             _num(i18n.t(lang, 'n_elev'), f'{r["elev"]} m'),
             _num(i18n.t(lang, 'n_dist'), f'{i18n.number(lang, r["dist"], 1)} km'),
-            _num(i18n.t(lang, 'n_obsc'), f'{i18n.number(lang, r["obsc"], 1)}%', 'hi'),
+            _num(i18n.t(lang, 'n_obsc'),
+                 i18n.obscuration(lang, r['obsc'], r['total']), 'hi'),
         ]
         if r['total']:
             nums.append(_num(i18n.t(lang, 'n_dur'),
@@ -150,7 +152,7 @@ def render_place(origin, radius_km, rows, min_clear, lang='es', event=None,
     <th>{i18n.t(lang, 'col_alt')}</th><th>{i18n.t(lang, 'col_horizon')}</th>
     <th>{i18n.t(lang, 'col_margin')}</th>
   </tr></thead><tbody>{''.join(trs)}</tbody></table></div>
-  <p class="caption">{i18n.t(lang, 'origin_note', place=esc(place),
+  <p class="caption">{i18n.t(lang, 'origin_note', place=esc(place_full),
                              lat=origin['lat'], lon=origin['lon'],
                              gazetteer=sources.cite('osm'))}</p>
 </section>

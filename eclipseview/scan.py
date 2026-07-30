@@ -25,12 +25,18 @@ DISTS = np.concatenate([np.arange(400.0, 25000.0, 180.0),
                         np.arange(25000.0, 150000.0, 800.0)])
 
 
-def main():
+def main(min_dur=MIN_DUR, min_mag=None, out_path=None, stride=STRIDE):
+    """Sweep the region and compute clearance for every land point that passes.
+
+    `min_mag` selects by eclipse magnitude instead of by seconds of totality, which is
+    how we reach the deep-partial ground outside the path: from a town 100 km north of
+    the shadow the honest recommendation is still a viewpoint, not an empty result.
+    """
     f = field.load()
 
     # Candidate grid over the mosaic
-    rows = np.arange(0, 3600, STRIDE)
-    cols = np.arange(0, 8400, STRIDE)
+    rows = np.arange(0, 3600, stride)
+    cols = np.arange(0, 8400, stride)
     lat_g = LAT_N - rows / PER_DEG
     lon_g = LON_W + cols / PER_DEG
     LO, LA = np.meshgrid(lon_g, lat_g)
@@ -40,9 +46,12 @@ def main():
     elev = elev_at(LA, LO)
     dur = field.interp(f['dur'], LA, LO)
 
-    keep = (dur >= MIN_DUR) & (elev >= 2.0)
+    if min_mag is not None:
+        keep = (field.interp(f['mag'], LA, LO) >= min_mag) & (elev >= 2.0)
+    else:
+        keep = (dur >= min_dur) & (elev >= 2.0)
     LA, LO, elev, dur = LA[keep], LO[keep], elev[keep], dur[keep]
-    print(f'inside band, on land, dur>={MIN_DUR:.0f}s: {LA.size:,}')
+    print(f'seleccionados (land + filtro): {LA.size:,}')
 
     a_c2 = field.interp(f['a_c2'], LA, LO); z_c2 = field.interp(f['z_c2'], LA, LO)
     a_c3 = field.interp(f['a_c3'], LA, LO); z_c3 = field.interp(f['z_c3'], LA, LO)
@@ -70,7 +79,7 @@ def main():
     d = dict(lat=LA, lon=LO, elev=elev, dur=dur, clear=clear,
              hz_c3=hz_c3, bd_c3=bd_c3, a_c2=a_c2, a_c3=a_c3,
              z_c2=z_c2, z_c3=z_c3, a_mx=a_mx, z_mx=z_mx)
-    with open(OUT, 'wb') as fh:
+    with open(out_path or OUT, 'wb') as fh:
         pickle.dump(d, fh)
 
     print(f'\nclearance: min {np.nanmin(clear):+.2f}  max {np.nanmax(clear):+.2f} deg')

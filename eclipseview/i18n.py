@@ -152,6 +152,22 @@ def deg(lang, value, decimals=2, sign=False):
     return number(lang, value, decimals, sign) + '°'
 
 
+def obscuration(lang, pct, total):
+    """Format an obscuration percentage without ever lying by rounding.
+
+    A partial eclipse of 99.994% must not print as "100.0% partial": that reads as a
+    contradiction and undermines every other number on the page. Add decimals until
+    the value stays below 100, and fall back to an explicit ">" if it never does.
+    """
+    if total:
+        return '100%'
+    for decimals in (1, 2, 3):
+        s = number(lang, pct, decimals)
+        if float(s.replace(',', '.')) < 100.0:
+            return s + '%'
+    return '>' + number(lang, 99.999, 3) + '%'
+
+
 def check(lang):
     """Keys missing from a locale, so an incomplete translation is visible."""
     base = set(STRINGS[DEFAULT])

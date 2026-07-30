@@ -1,0 +1,194 @@
+# -*- coding: utf-8 -*-
+"""Precomputed recommendation points for one eclipse.
+
+The insight that makes the site work without a backend: the answer to "where should I
+go from X" does not depend on X. It is always the same set of good viewpoints; X and
+the radius only decide which of them are close enough. So compute the viewpoints once,
+ship them, and let the query be a filter.
+
+This dataset is specific to ONE eclipse: the Sun's azimuth and altitude at every point
+are baked into the clearances and into the drawn horizon.
+
+Output (points.json):
+  meta   - event, azimuth window, how the set was built
+  points - one entry per recommended viewpoint, including a compact horizon profile so
+           the browser can draw the panorama without shipping an SVG each.
+"""
+import json
+import os
+import pickle
+
+import numpy as np
+
+from . import events, gazetteer, obstacles
+from .analysis import evaluate, km
+from .ephem import circumstances, sun_track
+from .panorama import AZ_LO, AZ_HI
+from .paths import DATA_DIR, SCAN_PKL
+from .terrain import elev_fine, horizon_fine
+
+# Horizon sampled across the plotted window; 0.25 deg is finer than the Sun's diameter.
+AZ_STEP = 0.25
+AZIMUTHS = np.arange(AZ_LO, AZ_HI + 1e-9, AZ_STEP)
+
+MIN_CLEAR = 2.0        # a recommendation must have real margin, not just be positive
+SEP_KM = 11.0          # spatial spacing between recommendations
+MAX_POINTS = 700
+
+
+def select(scan_path=SCAN_PKL, min_clear=MIN_CLEAR, sep_km=SEP_KM,
+           max_points=MAX_POINTS, progress=None):
+    """Pick well-spread viewpoints from the band-wide scan, best first."""
+    with open(scan_path, 'rb') as f:
+        d = pickle.load(f)
+    lat, lon, clear, dur = d['lat'], d['lon'], d['clear'], d['dur']
+    elev, alt = d['elev'], d['a_c3']
+
+    ok = clear >= min_clear
+    idx = np.where(ok)[0]
+    # Rank by what actually makes a viewpoint good: margin, then seconds of corona,
+    # then how high the Sun is (transparency).
+    score = np.minimum(clear[idx], 8.0) + dur[idx] / 20.0 + np.minimum(alt[idx], 12) * 0.5
+    order = idx[np.argsort(-score)]
+
+    # Greedy spacing on a grid, which is O(n) instead of O(n^2) against every pick.
+    cell = sep_km / 111.2
+    taken = set()
+    picks = []
+    for i in order:
+        key = (int(lat[i] / cell), int(lon[i] / (cell / np.cos(np.radians(lat[i])))))
+        if key in taken:
+            continue
+        if any((key[0] + a, key[1] + b) in taken
+               for a in (-1, 0, 1) for b in (-1, 0, 1)):
+            continue
+        taken.add(key)
+        picks.append(int(i))
+        if len(picks) >= max_points:
+            break
+        if progress and len(picks) % 50 == 0:
+            progress(len(picks), max_points, 'seleccionando')
+    return d, picks
+
+
+def build(out_path=None, progress=None, geocode=True, event=None,
+          check_obstacles=True):
+    ev = event or events.DEFAULT
+    out_path = out_path or os.path.join(DATA_DIR, 'points.json')
+    d, picks = select(progress=progress)
+    lat, lon = d['lat'], d['lon']
+
+    points = []
+    n = len(picks)
+    for k, i in enumerate(picks, 1):
+        if progress and k % 10 == 0:
+            progress(k, n, 'calculando horizontes')
+        la, lo = float(lat[i]), float(lon[i])
+        e = float(elev_fine(la, lo)[0])
+        c = circumstances(la, lo, e)
+        hz = horizon_fine(la, lo, AZIMUTHS, obs_elev=e)
+
+        # Sun track every 10 min through the plotted window, for the browser to draw.
+        t0 = _ts_utc(ev, -60)
+        t1 = _ts_utc(ev, 75)
+        saz, _, salt, _ = sun_track(la, lo, e, t0, t1, step_s=600.0)
+        keep = (saz >= AZ_LO - 2) & (saz <= AZ_HI + 2)
+
+        total = bool(c['total'])
+        if total:
+            alt_ref, az_ref = c['c3_alt_app'], c['c3_az']
+            clear = min(c['c2_alt_app'] - float(np.interp(c['c2_az'], AZIMUTHS, hz)),
+                        c['c3_alt_app'] - float(np.interp(c['c3_az'], AZIMUTHS, hz)))
+        else:
+            alt_ref, az_ref = c['max_alt_app'], c['max_az']
+            clear = alt_ref - float(np.interp(az_ref, AZIMUTHS, hz))
+        horizon = float(np.interp(az_ref, AZIMUTHS, hz))
+
+        from .ephem import moon_offset
+        iso = c['max_utc']
+        tmax = _ts_at(iso)
+        d_az, d_alt, r_sun, r_moon = moon_offset(la, lo, e, tmax)
+
+        points.append(dict(
+            i=k, lat=round(la, 5), lon=round(lo, 5), elev=round(e),
+            total=total, dur=round(c['duration_s'], 1),
+            obsc=round(c['obscuration'] * 100, 3),
+            alt=round(alt_ref, 2), az=round(az_ref, 2),
+            alt2=round(c['c2_alt_app'], 2) if total else round(alt_ref, 2),
+            hz=round(horizon, 2), clear=round(clear, 2),
+            t=_local(ev, c['max_utc']),
+            t2=_local(ev, c['c2_utc']) if total else None,
+            t3=_local(ev, c['c3_utc']) if total else None,
+            # horizon profile in hundredths of a degree keeps the payload small
+            prof=[int(round(v * 100)) for v in hz],
+            sun=[[round(float(a), 2), round(float(v), 2)]
+                 for a, v in zip(saz[keep], salt[keep])],
+            moon=[round(d_az, 4), round(d_alt, 4), round(r_sun, 4), round(r_moon, 4)],
+        ))
+
+    if check_obstacles:
+        # The DEM's blind spot, filled from OpenStreetMap: trees and buildings in the
+        # sight line. The IGN's visualiser states it ignores both; this is where we
+        # can actually do better rather than just finer.
+        lookup = lambda a, b: float(elev_fine(a, b)[0])          # noqa: E731
+        for k, p in enumerate(points, 1):
+            if progress and k % 5 == 0:
+                progress(k, len(points), 'buscando árboles y edificios (OSM)')
+            o = obstacles.check(p['lat'], p['lon'], p['az'], p['elev'],
+                                elev_lookup=lookup)
+            p['obs'] = round(o.get('angle', 0.0), 2)
+            p['obs_ok'] = bool(o.get('ok'))
+            w = o.get('worst')
+            if w:
+                p['obs_what'] = w['kind']
+                p['obs_d'] = w['dist_m']
+                p['obs_h'] = w['height_m']
+                p['obs_meas'] = w['measured']
+            # clearance after accounting for what is standing on the ground
+            p['clear_net'] = round(min(p['clear'], p['alt'] - max(p['hz'], p['obs'])), 2)
+            p['sv'] = obstacles.streetview_url(p['lat'], p['lon'], p['az'])
+
+    if geocode:
+        for k, p in enumerate(points, 1):
+            if progress and k % 10 == 0:
+                progress(k, len(points), 'poniendo nombres')
+            p['place'] = gazetteer.reverse(p['lat'], p['lon'])
+
+    meta = dict(
+        event=ev.key, event_label=ev.label, date=ev.iso_date,
+        tz_label=ev.tz_label,
+        az_lo=AZ_LO, az_hi=AZ_HI, az_step=AZ_STEP,
+        min_clear=MIN_CLEAR, sep_km=SEP_KM, n=len(points),
+        note=('Puntos recomendados precalculados para este eclipse. Buscar por '
+              'localidad y radio es un filtro sobre este conjunto: no se calcula '
+              'nada en vivo.'))
+    with open(out_path, 'w') as f:
+        json.dump(dict(meta=meta, points=points), f, ensure_ascii=False,
+                  separators=(',', ':'))
+    return out_path, meta
+
+
+def _ts_utc(ev, minutes_from_mid):
+    """A skyfield Time offset from the middle of the event's search window."""
+    from .ephem import _ts
+    h0, m0 = ev.search_start_utc
+    h1, m1 = ev.search_end_utc
+    mid = ((h0 * 60 + m0) + (h1 * 60 + m1)) / 2 + minutes_from_mid
+    return _ts.utc(ev.date[0], ev.date[1], ev.date[2], 0, mid, 0)
+
+
+def _ts_at(iso):
+    from .ephem import _ts
+    return _ts.utc(int(iso[0:4]), int(iso[5:7]), int(iso[8:10]),
+                   int(iso[11:13]), int(iso[14:16]), float(iso[17:19]))
+
+
+def _local(ev, iso):
+    h = (int(iso[11:13]) + int(ev.tz_offset_h)) % 24
+    return f'{h:02d}:{iso[14:16]}'
+
+
+if __name__ == '__main__':
+    path, meta = build(progress=lambda a, b, m: print(f'  [{a}/{b}] {m}', flush=True))
+    print(f"\n{meta['n']} puntos -> {path}")
+    print(f"tamaño: {os.path.getsize(path)/1e6:.1f} MB")

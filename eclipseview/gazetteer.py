@@ -164,14 +164,20 @@ def search(query, lang='es', limit=8, country_codes=None, use_cache=True):
     return out
 
 
-def describe(c):
-    """One-line label for a candidate, for menus and reports."""
-    bits = [c['name']] + c['admin']
+def describe(c, short=False):
+    """One-line label for a candidate.
+
+    `short` drops the population, for headlines: "Soria, Castilla y Leon" reads as a
+    title, "Soria, Castilla y Leon - 40.941 hab." does not.
+    """
+    bits = [c['name']] + c['admin'][:1 if short else 2]
     if c.get('country') and c.get('country_code') != 'ES':
         bits.append(c['country'])
     s = ', '.join(b for b in bits if b)
     if c['kind'] == 'feature':
         s += f" ({c['place_type']})"
+    if short:
+        return s
     if c.get('population'):
         s += f" · {c['population']:,} hab.".replace(',', '.')
     return s

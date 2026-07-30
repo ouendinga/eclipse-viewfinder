@@ -241,6 +241,14 @@ def cmd_build_mosaic(a):
     demdata.main()
 
 
+def cmd_site(a):
+    from . import site
+    out, entries = site.build(out_dir=a.out, lang=a.lang,
+                              progress=lambda m: print(f'  {m}', flush=True),
+                              with_overview=not a.no_overview)
+    print(f'\n{len(entries)} sitios -> {out}')
+
+
 def cmd_langs(a):
     for lang in i18n.available():
         gaps = i18n.check(lang)
@@ -304,6 +312,12 @@ def build_parser():
 
     sp = sub.add_parser('build-mosaic', help='reconstruir solo el mosaico')
     sp.set_defaults(func=cmd_build_mosaic)
+
+    sp = sub.add_parser('site', help='generar el sitio estatico con lugares precalculados')
+    sp.add_argument('-o', '--out', default=None)
+    sp.add_argument('--lang', default='es')
+    sp.add_argument('--no-overview', action='store_true')
+    sp.set_defaults(func=cmd_site)
 
     sp = sub.add_parser('langs', help='idiomas disponibles y huecos de traducción')
     sp.set_defaults(func=cmd_langs)
