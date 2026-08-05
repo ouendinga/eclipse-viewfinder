@@ -239,7 +239,11 @@ def _dump(out_path, ev, points, extra=None):
         event=ev.key, event_label=ev.label, date=ev.iso_date, tz_label=ev.tz_label,
         az_lo=AZ_LO, az_hi=AZ_HI, az_step=AZ_STEP,
         min_clear=MIN_CLEAR, sep_km=SEP_KM, n=len(points),
+        # se recuentan aquí y no los pasa quien llama: si cada script tuviera que
+        # acordarse de arrastrar el contador del otro, el primero que lo olvide deja
+        # el meta mintiendo sobre cuántos puntos están comprobados
         n_obs_checked=sum(1 for p in points if p.get('obs_ok')),
+        n_access_checked=sum(1 for p in points if p.get('acc_ok')),
         note=('Puntos recomendados precalculados para este eclipse. Buscar por '
               'localidad y radio es un filtro sobre este conjunto: no se calcula '
               'nada en vivo.'))

@@ -21,10 +21,10 @@ TIERS = [
          intro='La mejor climatología de toda la franja, a cambio de perder segundos '
                'de totalidad y algo de altura del Sol, porque la línea central pasa '
                'bastante al sur.'),
-    dict(key='cerca', eyebrow='Si no quieres cruzar España',
+    dict(key='cerca', eyebrow='El extremo oriental de la franja',
          title='Lo más cerca del Mediterráneo que funciona',
-         intro='La franja roza el sur de Catalunya, así que hay totalidad a poco más '
-               'de una hora de Barcelona. El problema es que casi todo el sur de '
+         intro='La franja roza el sur de Catalunya: es lo único que da totalidad sin '
+               'alejarse del Mediterráneo. El problema es que casi todo el sur de '
                'Catalunya mira al ONO contra montaña, con una excepción clara.'),
     dict(key='techo', eyebrow='La mejor vista posible — y la más arriesgada',
          title='La costa de Asturias',

@@ -207,8 +207,26 @@ def script(max_radius=MAX_RADIUS_KM):
       st.textContent='No he podido consultar el buscador de lugares.'; });
   }
 
+  // El ensayo trae tablas y fichas con «km hasta el punto» sin rellenar: la distancia
+  // no tiene respuesta hasta que el lector dice desde dónde viene. En cuanto elige
+  // localidad se recalculan todas desde ahí, en vez de contestar siempre desde
+  // Barcelona, que para quien lee esto desde Vigo es ruido.
+  function retag(){
+    if(!ORIGIN) return;
+    [].forEach.call(document.querySelectorAll('.dcol[data-lat]'),function(el){
+      var d=Math.round(km(ORIGIN.lat,ORIGIN.lon,+el.dataset.lat,+el.dataset.lon));
+      var v=el.querySelector('.v'), k=el.querySelector('.k');
+      if(v){ v.textContent=d+' km'; if(k) k.textContent='desde '+ORIGIN.name; }
+      else el.textContent=d;
+    });
+    [].forEach.call(document.querySelectorAll('th.dcol'),function(el){
+      el.textContent='km desde '+ORIGIN.name;
+    });
+  }
+
   function run(){
     if(!DATA||!ORIGIN) return;
+    retag();
     var rad=Math.min(+r.value,MAXR);
     var hits=DATA.points.map(function(p){
       return {p:p,d:km(ORIGIN.lat,ORIGIN.lon,p.lat,p.lon)};

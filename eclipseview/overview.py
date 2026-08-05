@@ -83,7 +83,8 @@ def _site_card(r):
         _num('horizonte real', D(r['horizon'])),
         _num('margen libre', D(cl), _margin_class(cl)),
         _num('hora (CEST)', (r['c2_local'] or r['max_local'])[:5]),
-        _num('desde Barcelona', f"{N(r['dist'], 0)} km"),
+        (f'<div class="num dcol" data-lat="{r["lat"]:.5f}" data-lon="{r["lon"]:.5f}">'
+         f'<div class="k">distancia</div><div class="v">—</div></div>'),
     ]
     if z:
         nums.append(_num('zona apta', f"{N(z['frac_ok'] * 100, 0)}%"))
@@ -107,6 +108,20 @@ def _site_card(r):
 </article>'''
 
 
+# «¿A cuántos km me queda?» no tiene respuesta hasta que el lector dice desde dónde
+# viene. Antes se contestaba siempre desde Barcelona, que para quien lee esto desde
+# Vigo es ruido. Se marcan las celdas con su coordenada y el buscador las rellena con
+# el origen que ponga; hasta entonces valen «—», que es la marca de «no aplica» que ya
+# usa el resto de la página.
+def _dist_th():
+    return '<th class="dcol">km hasta el punto</th>'
+
+
+def _dist_td(r):
+    return (f'<td class="dcol" data-lat="{r["lat"]:.5f}" '
+            f'data-lon="{r["lon"]:.5f}">—</td>')
+
+
 def _ladder(sites):
     rows = []
     for key in roster.LADDER:
@@ -114,14 +129,14 @@ def _ladder(sites):
         if not r:
             continue
         rows.append(
-            f"<tr><td>{esc(r['label'])}</td><td>{N(r['dist'], 0)}</td>"
+            f"<tr><td>{esc(r['label'])}</td>{_dist_td(r)}"
             f"<td>{N(r['dur'], 0) + ' s' if r['total'] else '—'}</td>"
             f"<td>{i18n.deg(LANG, r['alt'], 1)}</td>"
             f"<td class=\"{_td_class(r['clear'])}\">{D(r['clear'])}</td>"
             f"<td>{N(r['zone']['frac_ok'] * 100, 0) + '%' if r['zone'] else '—'}</td>"
             f"</tr>")
     return ('<div class="tablewrap"><table><thead><tr><th>sitio</th>'
-            '<th>km desde Barcelona</th><th>totalidad</th><th>sol</th>'
+            f'{_dist_th()}<th>totalidad</th><th>sol</th>'
             '<th>margen</th><th>zona apta</th></tr></thead><tbody>'
             + ''.join(rows) + '</tbody></table></div>')
 
@@ -140,11 +155,11 @@ def _full_table(sites):
             f"<td>{D(r['horizon'])}</td>"
             f"<td class=\"{_td_class(r['clear'])}\">{D(r['clear'])}</td>"
             f"<td>{N(z['frac_ok'] * 100, 0) + '%' if z else '—'}</td>"
-            f"<td>{N(r['dist'], 0)}</td></tr>")
+            f"{_dist_td(r)}</tr>")
     return ('<div class="tablewrap"><table><thead><tr><th>sitio</th>'
             '<th>lat, lon</th><th>m</th><th>totalidad s</th><th>sol oculto</th>'
             '<th>altura sol</th><th>azimut</th><th>horizonte</th><th>margen</th>'
-            '<th>zona apta</th><th>km BCN</th></tr></thead><tbody>'
+            f'<th>zona apta</th>{_dist_th()}</tr></thead><tbody>'
             + ''.join(rows) + '</tbody></table></div>')
 
 
@@ -293,11 +308,12 @@ def render(data, finder_html='', finder_css='', finder_js=''):
 </section>
 
 <section>
-  <h2>Qué compra cada hora de coche</h2>
+  <h2>Qué se gana yendo más al oeste</h2>
   <p class="prose">Cuanto más al oeste, más alto está el Sol, más dura la totalidad y
   más perdona el terreno. La columna que de verdad importa es <b>zona apta</b>: qué
   porcentaje del entorno mantiene margen suficiente, o sea cuánto perdona el sitio si
-  no aciertas con el punto exacto.</p>
+  no aciertas con el punto exacto. Si pones tu localidad en el buscador de arriba, la
+  columna de kilómetros se recalcula desde ahí.</p>
   {_ladder(s)}
 </section>
 
@@ -308,8 +324,9 @@ def render(data, finder_html='', finder_css='', finder_js=''):
   {_full_table(s)}
   <p class="caption"><b>margen</b> = grados entre el Sol y el terreno real durante
   todo el evento (negativo = el Sol se pone antes). <b>zona apta</b> = porcentaje del
-  entorno que mantiene más de {D(2.0)} de margen. Distancias en línea recta desde
-  Barcelona; por carretera, cuenta aproximadamente un 25 % más.</p>
+  entorno que mantiene más de {D(2.0)} de margen. Las distancias son en línea recta
+  desde la localidad que pongas en el buscador; por carretera, cuenta aproximadamente
+  un 25 % más.</p>
 </section>
 
 {_climatology()}
