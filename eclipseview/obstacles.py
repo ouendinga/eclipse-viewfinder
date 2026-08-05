@@ -351,6 +351,146 @@ def check(lat, lon, az_deg, obs_elev, elev_lookup=None, use_cache=True,
     return out
 
 
+ROAD_RADIUS_M = 250.0        # más allá de esto no hay ni Street View ni acceso fácil
+SV_MAX_ROAD_M = 60.0         # Street View se toma desde la vía: sin vía, no hay foto
+
+# Street View se graba desde vías rodadas. Un sendero a 66 m o una pista forestal a 1 m
+# no dan foto -- fue justo el caso del primer enlace roto que apareció en producción.
+DRIVABLE = {'motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'unclassified',
+            'residential', 'living_street', 'motorway_link', 'trunk_link',
+            'primary_link', 'secondary_link', 'tertiary_link'}
+# Se llega, pero en general sin cobertura fotográfica.
+ROUGH = {'service', 'track'}
+WALKABLE = {'path', 'footway', 'bridleway', 'steps', 'cycleway'}
+
+# Señales de que hace falta 4x4 o al menos altura libre. OSM las etiqueta a propósito;
+# lo que NO se puede es dar por bueno el silencio: la mayoría de vías no llevan estas
+# etiquetas, así que "sin datos" tiene que decirse, no interpretarse como "fácil".
+ROUGH_SMOOTH = {'bad', 'very_bad', 'horrible', 'impassable'}
+ROUGH_SURFACE = {'ground', 'dirt', 'earth', 'mud', 'sand', 'grass', 'unpaved'}
+ACCESS_RADIUS_M = 1200.0
+
+
+def check_roads_batch(items, batch=15, progress=None, timeout=60):
+    """Distancia a la vía transitable más cercana, para cada punto.
+
+    Nació de un enlace roto: el Street View de un punto en pleno campo abría una
+    pantalla negra porque allí no hay fotos. Pero el dato sirve para algo más
+    importante que esconder un enlace: si no hay vía cerca, probablemente tampoco se
+    llega, y eso es justo lo que el modelo de elevación no puede decirte.
+
+    `items` es una secuencia de (lat, lon). Devuelve metros a la vía más cercana, o
+    None si no se pudo consultar.
+    """
+    cache = _load()
+    out = [None] * len(items)
+    todo = []
+    for i, (lat, lon) in enumerate(items):
+        key = f'road2:{lat:.4f},{lon:.4f}'
+        if key in cache:
+            out[i] = cache[key]
+        else:
+            todo.append(i)
+
+    R = 6371000.0
+    for start in range(0, len(todo), batch):
+        chunk = [todo[k] for k in range(start, min(start + batch, len(todo)))]
+        if progress:
+            progress(start + len(chunk), len(todo), 'vías de acceso (OSM)')
+        parts = []
+        for i in chunk:
+            lat, lon = items[i]
+            dla = math.degrees(ACCESS_RADIUS_M / R)
+            dlo = math.degrees(ACCESS_RADIUS_M / (R * math.cos(math.radians(lat))))
+            parts.append(f'way["highway"]({lat-dla},{lon-dlo},{lat+dla},{lon+dlo});')
+        q = (f'[out:json][timeout:{timeout}];(' + ''.join(parts) +
+             ');out tags geom;')
+        try:
+            data = _query_raw(q, timeout)
+        except Exception:
+            continue
+        ways = [w for w in data.get('elements', []) if w.get('geometry')]
+        for i in chunk:
+            lat, lon = items[i]
+            any_best = drive_best = walk_best = None
+            for w in ways:
+                tg = w.get('tags') or {}
+                hw = tg.get('highway', '')
+                if hw in ('proposed', 'construction', 'raceway'):
+                    continue
+                d = min((math.hypot(
+                    math.radians(nd['lon'] - lon) * R * math.cos(math.radians(lat)),
+                    math.radians(nd['lat'] - lat) * R)) for nd in w['geometry'])
+                if d > ACCESS_RADIUS_M:
+                    continue
+                cand = (d, hw, tg)
+                if any_best is None or d < any_best[0]:
+                    any_best = cand
+                if hw in DRIVABLE | ROUGH and (drive_best is None or d < drive_best[0]):
+                    drive_best = cand
+                if hw in WALKABLE and (walk_best is None or d < walk_best[0]):
+                    walk_best = cand
+
+            def profile(c):
+                if not c:
+                    return None
+                d, hw, tg = c
+                hard = []
+                if tg.get('4wd_only') == 'yes':
+                    hard.append('4wd_only')
+                if tg.get('smoothness') in ROUGH_SMOOTH:
+                    hard.append('smoothness=' + tg['smoothness'])
+                if tg.get('tracktype') in ('grade4', 'grade5'):
+                    hard.append(tg['tracktype'])
+                if tg.get('surface') in ROUGH_SURFACE:
+                    hard.append('surface=' + tg['surface'])
+                return dict(m=round(d), kind=hw, surface=tg.get('surface'),
+                            smoothness=tg.get('smoothness'),
+                            tracktype=tg.get('tracktype'),
+                            access=tg.get('access') or tg.get('motor_vehicle'),
+                            hard=hard,
+                            # sin ninguna de esas etiquetas no se puede afirmar nada
+                            rated=bool(tg.get('surface') or tg.get('smoothness')
+                                       or tg.get('tracktype') or tg.get('4wd_only')))
+
+            paved = None
+            for w in ways:
+                tg = w.get('tags') or {}
+                if tg.get('highway') not in DRIVABLE:
+                    continue
+                d = min((math.hypot(
+                    math.radians(nd['lon'] - lon) * R * math.cos(math.radians(lat)),
+                    math.radians(nd['lat'] - lat) * R)) for nd in w['geometry'])
+                if d <= ACCESS_RADIUS_M and (paved is None or d < paved[0]):
+                    paved = (d, tg.get('highway'), tg)
+
+            res = dict(near=profile(any_best), drive=profile(drive_best),
+                       walk=profile(walk_best), paved=profile(paved),
+                       radius_m=ACCESS_RADIUS_M)
+            cache[f'road2:{lat:.4f},{lon:.4f}'] = res
+            out[i] = res
+        _save()
+    return out
+
+
+def _query_raw(q, timeout=45, tries=3):
+    eps = healthy_endpoints()
+    last = None
+    for attempt in range(tries):
+        url = eps[attempt % len(eps)]
+        try:
+            req = urllib.request.Request(
+                url, data=urllib.parse.urlencode({'data': q}).encode(),
+                headers={'User-Agent': UA})
+            _throttle()
+            with urllib.request.urlopen(req, timeout=timeout + 15) as r:
+                return json.load(r)
+        except Exception as e:
+            last = e
+            time.sleep(2.0 * (attempt + 1))
+    raise last
+
+
 def streetview_url(lat, lon, heading_deg, pitch=0):
     """One-click Street View at the exact bearing to the Sun.
 

@@ -249,6 +249,28 @@ def script(max_radius=MAX_RADIUS_KM):
   // ser un dato bueno.
   function net(p){ return (p.clear_net!==undefined && p.obs_ok) ? p.clear_net : p.clear; }
 
+  // Accesibilidad a partir de las etiquetas de OpenStreetMap. Lo que NO se puede es
+  // interpretar el silencio: la mayoría de vías no llevan surface/smoothness, así que
+  // «sin datos» se dice, no se traduce por «fácil».
+  function acc_label(p){
+    if(!p.acc_ok||!p.acc) return 'sin comprobar';
+    var a=p.acc, pv=a.paved, dr=a.drive;
+    if(pv && pv.m<=100) return 'asfalto a '+n(pv.m,0)+' m';
+    if(dr && dr.m<=150) return (dr.kind==='track'?'pista':'v\u00eda')+' a '+n(dr.m,0)+' m'+
+      (dr.hard&&dr.hard.length?' \u00b7 dura':'');
+    if(pv) return 'asfalto a '+(pv.m>=1000? n(pv.m/1000,1)+' km':n(pv.m,0)+' m');
+    if(dr) return 'pista a '+(dr.m>=1000? n(dr.m/1000,1)+' km':n(dr.m,0)+' m');
+    if(a.walk) return 'solo sendero';
+    return 'sin v\u00eda en 1,2 km';
+  }
+  function acc_class(p){
+    if(!p.acc_ok||!p.acc) return 'no';
+    var a=p.acc;
+    if(a.paved && a.paved.m<=150) return 'ok';
+    if(a.drive && a.drive.m<=150 && !(a.drive.hard||[]).length) return '';
+    return 'no';
+  }
+
   function card(h){
     var p=h.p, cl=net(p);
     var mc=cl>=2?'ok':(cl<0?'no':'w'), bc=p.total?'g':(cl>=2?'w':'b');
@@ -295,6 +317,7 @@ def script(max_radius=MAX_RADIUS_KM):
         num('hora',(p.t2||p.t))+
         num('árboles/edificios', p.obs_ok ? (p.obs>0? deg(p.obs,2,true) : 'nada') : 'sin comprobar',
             p.obs_ok ? '' : 'no')+
+        num('acceso', acc_label(p), acc_class(p))+
       '</div>'+
       '<div class="panowrap">'+pano(p)+'</div>'+
       '<div class="why">'+why(p,h.d)+
@@ -330,6 +353,22 @@ def script(max_radius=MAX_RADIUS_KM):
       s+=' <b>Árboles y edificios sin comprobar</b> en este punto: el margen es solo el del terreno.';
     }
     s+=' A '+n(d,1)+' km en línea recta.';
+    if(p.acc_ok && p.acc){
+      var a=p.acc, bits=[];
+      if(a.paved) bits.push('carretera asfaltada a '+(a.paved.m>=1000?n(a.paved.m/1000,1)+' km':n(a.paved.m,0)+' m'));
+      else bits.push('<b>ninguna carretera asfaltada</b> en 1,2 km');
+      if(a.drive && (!a.paved || a.drive.m < a.paved.m)){
+        var dur=(a.drive.hard||[]).length;
+        bits.push((a.drive.kind==='track'?'pista':'v\u00eda')+' a '+n(a.drive.m,0)+' m'+
+          (dur? ' que OSM marca como <b>dura</b> ('+esc(a.drive.hard.join(', '))+'): '+
+                'cuenta con 4x4 o con andar' :
+                (a.drive.rated? '' : ' (sin etiquetas de firme: no se sabe c&oacute;mo est&aacute;)')));
+      }
+      if(a.walk) bits.push('sendero a '+n(a.walk.m,0)+' m');
+      s+=' <b>Acceso:</b> '+bits.join('; ')+'.';
+    } else if(!p.acc_ok){
+      s+=' <b>Acceso sin comprobar.</b>';
+    }
     return s;
   }
 

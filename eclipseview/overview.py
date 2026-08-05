@@ -316,6 +316,71 @@ def render(data, finder_html='', finder_css='', finder_js=''):
 
 {_verification(data['checks'], data['summary'])}
 
+
+<section id="fuentes">
+  <p class="eyebrow">De dónde sale cada dato</p>
+  <h2>Fuentes</h2>
+  <p class="prose">Regla del proyecto: <b>cada cifra o la calcula el código, o tiene
+  cita</b>. Lo que no es ninguna de las dos cosas no entra.</p>
+  <div class="tablewrap"><table><thead><tr><th>dato</th><th>fuente</th>
+  <th>licencia</th></tr></thead><tbody>
+    <tr><td>Geometría del eclipse (contactos, duración, magnitud, obscuración,
+        altura y azimut del Sol)</td><td>calculado con efemérides
+        {sources.cite('de421')}</td><td>dominio público</td></tr>
+    <tr><td>Relieve y perfil del horizonte</td><td>SRTM 1&Prime; (~30 m) vía
+        {sources.cite('srtm')}</td><td>dominio público</td></tr>
+    <tr><td>Árboles, edificios y vías de acceso</td><td>{sources.cite('osm')}</td><td>ODbL</td></tr>
+    <tr><td>Topónimos</td><td>Nominatim / OpenStreetMap</td><td>ODbL</td></tr>
+    <tr><td>Nubosidad de agosto</td><td>{sources.cite('eclipsophile')}</td><td>citada, no
+        redistribuida</td></tr>
+    <tr><td>Contraste de los cálculos</td><td>{sources.cite('ign')} y {sources.cite('nasa_gsfc')}</td><td>citadas</td></tr>
+  </tbody></table></div>
+  <p class="caption">El código es público y la metodología está escrita:
+  <a href="https://github.com/ouendinga/eclipse-viewfinder">github.com/ouendinga/eclipse-viewfinder</a>.
+  Los cálculos son reproducibles: mismo commit y mismos datos, mismos números.</p>
+</section>
+
+<section id="aviso">
+  <p class="eyebrow">Léelo antes de conducir 200 km</p>
+  <h2>Aviso: esto no es una garantía</h2>
+  <div class="note warn">
+    <p><b>No me hago responsable de que llegues a ver el eclipse.</b> Esto es una
+    herramienta de cálculo, no una promesa. Aunque la geometría sea correcta, entre tú
+    y la corona hay cosas que ningún modelo controla: <b>nubes, calima, humo de
+    incendios</b> o simplemente que ese día haga mal tiempo.</p>
+
+    <p><b>Los datos no son 100 % fiables.</b> Con nombres y apellidos:</p>
+    <ul>
+      <li>Las <b>duraciones</b> llevan un sesgo de +2–3 % frente al IGN por el convenio
+      de radio lunar: cuéntalas como ±3 s. Para horarios oficiales, el IGN.</li>
+      <li>No modelo el <b>perfil real del limbo lunar</b>. Justo en el borde de la
+      franja, eso es lo que decide entre ver corona y no verla.</li>
+      <li>El relieve es SRTM: <b>no ve árboles ni edificios</b>. Eso se cubre aparte
+      con OpenStreetMap, pero <b>no en todos los puntos</b> — los que no se han podido
+      comprobar lo dicen.</li>
+      <li>Las <b>alturas del arbolado son estimadas</b> (18 m de pinar maduro): OSM
+      casi nunca las trae.</li>
+      <li>La <b>refracción</b> cerca del horizonte varía con la temperatura y puede
+      mover el terreno lejano una o dos décimas de grado.</li>
+      <li>La <b>nubosidad</b> es climatología de años anteriores, <b>no un
+      pronóstico</b>.</li>
+    </ul>
+
+    <p><b>Ni el acceso ni el punto están garantizados.</b> Las coordenadas son puntos
+    del <b>terreno</b>, elegidos por su horizonte, no por poder aparcar allí. La
+    información de accesibilidad sale de OpenStreetMap, que lo mantiene gente
+    voluntaria: puede estar incompleta, desactualizada o equivocada. <b>Un punto puede
+    caer en finca privada, en camino cerrado o en terreno protegido.</b> Comprueba el
+    acceso en el mapa antes de ir, respeta las propiedades y las señales, y no te
+    metas donde no debes.</p>
+
+    <p class="prose"><b>Lo que sí puedes hacer para asegurarte:</b> ir un par de días
+    antes a la misma hora. El 10 de agosto a las 20:30 el Sol estará casi en el mismo
+    sitio, así que verás con tus ojos lo que ningún modelo puede confirmarte — el pino,
+    la nave, el poste y si se llega.</p>
+  </div>
+</section>
+
 <section>
   <h2>Límites conocidos</h2>
   <div class="note warn">
