@@ -39,6 +39,17 @@ eclipseview/
    perezosa y un hijo por `fork` hereda el mapeo a medias y revienta en jplephem.
 5. **La cobertura incluye el corredor hacia el Sol hasta 150 km**, no solo el disco.
    Una tesela que falta se lee como nivel del mar → horizonte tapado que parece limpio.
+6. **El radio lunar de los contactos umbrales NO es el medio.** Con 1737,4 km las
+   duraciones salían +2,4 a +4,7 s largas. Está calibrado en `sources.py` contra NASA
+   e IGN, con tests que rehacen el ajuste. Si tocas el motor y esos tests fallan, el
+   problema es el motor, no el valor.
+7. **Una cita tiene que sostener su cifra.** Que la URL responda 200 no basta: hay que
+   leer si dice lo que decimos que dice. Una cita citaba «1 m 02 s» y el artículo decía
+   «alrededor de 55 segundos», y la tolerancia era tan ancha que nunca saltó.
+8. **Overpass limita por coste, no por número.** Con menos de cien consultas pesadas ya
+   devuelve 429 y «Connection refused». `healthy_endpoints()` devuelve lista vacía si no
+   contesta nadie, y los scripts abortan con código 2 en vez de fabricar fallos: una
+   comprobación que nunca puede decir «no» no comprueba nada.
 
 ## Antes de dar nada por bueno
 ```bash
