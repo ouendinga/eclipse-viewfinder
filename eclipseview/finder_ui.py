@@ -44,6 +44,16 @@ CSS = """
 .chip{display:inline-block;font:600 11px var(--mono);padding:2px 8px;
   border:1px solid currentColor;margin-left:8px}
 .chip.g{color:var(--good)} .chip.w{color:var(--warn)} .chip.b{color:var(--bad)}
+.ptcoord{font-family:var(--mono)!important;font-size:16px!important;letter-spacing:.01em}
+.ptlinks{display:flex;flex-wrap:wrap;gap:14px;margin:12px 0 0;
+  font:600 12px var(--mono)}
+.ptlinks a{color:var(--sun);text-decoration:none;border-bottom:1px solid currentColor}
+.ptlinks a.go{background:var(--sun);color:var(--ground);padding:5px 12px;
+  border:0;letter-spacing:.03em}
+.ptlinks a.go:hover{filter:brightness(1.12)}
+.ptwarn{padding:12px 20px;margin:0;font-size:13.5px;color:var(--muted);
+  background:var(--ground);border-bottom:1px solid var(--line-soft)}
+.ptwarn b{color:var(--text)}
 .spin{display:inline-block;width:11px;height:11px;border:2px solid var(--line);
   border-top-color:var(--sun);border-radius:50%;animation:sp .7s linear infinite;
   vertical-align:-1px;margin-right:7px}
@@ -208,7 +218,12 @@ def script(max_radius=MAX_RADIUS_KM):
     st.innerHTML='<b>'+hits.length+'</b> miradores a menos de '+rad+' km de '+
       esc(ORIGIN.name)+(tot?', '+tot+' de ellos con totalidad':', ninguno con totalidad')+
       '. Ordenados por margen sobre el terreno.';
-    res.innerHTML=hits.slice(0,8).map(card).join('');
+    res.innerHTML='<p class="ptwarn">Cada resultado es un <b>punto concreto</b> con '+
+      'sus coordenadas, no una recomendaci&oacute;n de pueblo: el municipio solo dice '+
+      'd&oacute;nde cae. Ir al centro de esa localidad puede no servir. '+
+      'Son puntos del <b>terreno</b>: comprueba en el mapa que se llega y que no es '+
+      'finca privada.</p>'+
+      hits.slice(0,8).map(card).join('');
   }
 
   // Margen neto: terreno + lo que haya plantado encima. Si no se pudo comprobar, se
@@ -222,10 +237,20 @@ def script(max_radius=MAX_RADIUS_KM):
     var badge=p.total?('TOTALIDAD '+n(p.dur,0)+' s'):(n(p.obsc,1)+'% parcial');
     function num(k,v,c){return '<div class="num '+(c||'')+'"><div class="k">'+k+
       '</div><div class="v">'+v+'</div></div>';}
+    // El titular es el PUNTO. El municipio es solo dónde cae: ponerlo en grande hace
+    // que la gente conduzca al centro del pueblo, que es justo el sitio que puede
+    // tener el horizonte tapado.
+    var coord=n(p.lat,5)+', '+n(p.lon,5);
+    // Navegar, no solo mirar: el punto es el destino, y con coordenadas exactas
+    // porque el centro del municipio puede estar a kilómetros y con el monte delante.
+    var nav='https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lon+
+            '&travelmode=driving';
+    var gmaps='https://www.google.com/maps/search/?api=1&query='+p.lat+','+p.lon;
+    var osm='https://www.openstreetmap.org/?mlat='+p.lat+'&mlon='+p.lon+'#map=15/'+p.lat+'/'+p.lon;
     return '<article class="site">'+
-      '<div class="site-h"><h3>'+esc(p.place||(n(p.lat,4)+', '+n(p.lon,4)))+'</h3>'+
-      '<span class="place">'+n(p.lat,4)+', '+n(p.lon,4)+'</span>'+
-      '<span class="badge '+bc+'">'+badge+'</span></div>'+
+      '<div class="site-h"><h3 class="ptcoord">'+coord+'</h3>'+
+      '<span class="place">'+(p.place? 'en el t&eacute;rmino de '+esc(p.place):'')+
+      '</span><span class="badge '+bc+'">'+badge+'</span></div>'+
       '<div class="nums">'+
         num('distancia',n(h.d,1)+' km')+
         num('altitud',p.elev+' m')+
@@ -238,7 +263,14 @@ def script(max_radius=MAX_RADIUS_KM):
             p.obs_ok ? '' : 'no')+
       '</div>'+
       '<div class="panowrap">'+pano(p)+'</div>'+
-      '<div class="why">'+why(p,h.d)+'</div></article>';
+      '<div class="why">'+why(p,h.d)+
+        '<div class="ptlinks">'+
+        '<a class="go" href="'+nav+'" target="_blank" rel="noopener">C&oacute;mo llegar \u2197</a>'+
+        '<a href="'+gmaps+'" target="_blank" rel="noopener">Ver en el mapa \u2197</a>'+
+        '<a href="'+osm+'" target="_blank" rel="noopener">OpenStreetMap \u2197</a>'+
+        (p.sv?'<a href="'+p.sv+'" target="_blank" rel="noopener">Street View mirando al Sol \u2197</a>':'')+
+        '</div>'+
+      '</div></article>';
   }
 
   function why(p,d){
@@ -250,7 +282,11 @@ def script(max_radius=MAX_RADIUS_KM):
       n(t,1)+' veces el diámetro del Sol. Ve a verlo antes.';
     else s='<b>Margen cómodo:</b> '+deg(p.clear,2,true)+' libres, unas '+n(t,0)+
       ' veces el diámetro del Sol.';
-    if(p.total) s+=' Aquí hay <b>totalidad: '+n(p.dur,0)+' s</b>, de '+p.t2+' a '+p.t3+'.';
+    if(p.total && p.dur < 30) s+=' Aquí entra la totalidad, pero solo <b>'+n(p.dur,0)+
+      ' s</b>: est&aacute;s justo en el borde de la sombra, donde el margen de error '+
+      'del c&aacute;lculo es alto y basta desplazarse unos kil&oacute;metros hacia el '+
+      'centro de la franja para ganar mucho.';
+    else if(p.total) s+=' Aquí hay <b>totalidad: '+n(p.dur,0)+' s</b>, de '+p.t2+' a '+p.t3+'.';
     else s+=' Eclipse <b>parcial</b>: '+n(p.obsc,2)+'% del disco oculto, sin corona.';
     if(p.obs_ok && p.obs>0 && p.obs_what){
       s+=' Ojo: hay <b>'+esc(p.obs_what)+'</b> de unos '+n(p.obs_h,0)+' m a '+
@@ -260,7 +296,6 @@ def script(max_radius=MAX_RADIUS_KM):
       s+=' <b>Árboles y edificios sin comprobar</b> en este punto: el margen es solo el del terreno.';
     }
     s+=' A '+n(d,1)+' km en línea recta.';
-    if(p.sv) s+=' <a href="'+p.sv+'" target="_blank" rel="noopener">Verlo en Street View mirando al Sol \u2197</a>';
     return s;
   }
 

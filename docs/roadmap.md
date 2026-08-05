@@ -21,6 +21,34 @@
 3. **Caché de resultados por celda** en vez de por consulta, para que dos pueblos
    vecinos reaprovechen trabajo.
 
+
+## Pendiente: mejorar la visión (lo que ve el usuario)
+
+Lo calculado está bien; lo que falla es cómo se presenta y qué falta comprobar.
+
+- [ ] **402 puntos (28 %) sin chequear contra árboles y edificios.** Overpass falló en
+      esos durante la pasada. Es reanudable (`./enrich.sh`, ~10 min) y la caché conserva
+      lo hecho. Mientras tanto se marcan «sin comprobar», nunca «limpio».
+- [ ] **Alturas de arbolado estimadas** (18 m de pinar maduro): OSM casi nunca las trae.
+      Van marcadas como estimación. Mejorable con datos de altura de dosel si aparecen.
+- [ ] **Topónimos pobres** en unos pocos puntos («España» a secas): bajar el zoom de la
+      geocodificación inversa y reintentar solo esos.
+- [ ] **Ordenación en el borde de la sombra.** Una totalidad de 6 s se lista por delante
+      de un parcial del 99,4 % con mejor margen. Se avisa en el texto, pero conviene
+      revisar si el orden debería penalizar las duraciones bajo ~30 s, donde el error
+      del cálculo y el perfil del limbo lunar pesan mucho.
+- [ ] **Perfil real del limbo lunar**: mueve los contactos algunos segundos, y justo en
+      el borde de la franja es lo que decide entre 6 s y nada.
+- [ ] **Analítica**: sin decidir (nada / solo visitas / visitas + localidades buscadas).
+
+### Hecho en esta ronda
+- La ficha identifica un **punto con coordenadas**, no un municipio: el nombre del
+  pueblo indujo a pensar que la recomendación era «ve a ese pueblo», cuando ir al
+  centro puede tener el horizonte tapado.
+- Enlace **«Cómo llegar»** que abre la navegación al punto exacto, más «ver en el mapa»,
+  OpenStreetMap y Street View apuntando al azimut del Sol.
+- Aviso de que son puntos del terreno: hay que comprobar acceso y finca privada.
+
 ## Objetivo total
 
 **Cualquier eclipse, en cualquier parte del mundo, en varios idiomas.**
