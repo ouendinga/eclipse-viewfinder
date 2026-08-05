@@ -379,8 +379,11 @@ def render(data, finder_html='', finder_css='', finder_js=''):
 
     <p><b>Los datos no son 100 % fiables.</b> Con nombres y apellidos:</p>
     <ul>
-      <li>Las <b>duraciones</b> llevan un sesgo de +2–3 % frente al IGN por el convenio
-      de radio lunar: cuéntalas como ±3 s. Para horarios oficiales, el IGN.</li>
+      <li>Las <b>duraciones</b> están contrastadas contra las cifras publicadas por
+      {sources.cite('nasa_gsfc')} y el {sources.cite('ign')} en cuatro puntos, de 59 s
+      a 138 s de totalidad: el peor desvío es de
+      <b>{i18n.number(LANG, sources.LUNAR_UMBRAL_RADIUS['max_dev_s'], 0)} s</b>.
+      Para horarios oficiales, el IGN.</li>
       <li>No modelo el <b>perfil real del limbo lunar</b>. Justo en el borde de la
       franja, eso es lo que decide entre ver corona y no verla.</li>
       <li>El relieve es SRTM: <b>no ve árboles ni edificios</b>. Eso se cubre aparte

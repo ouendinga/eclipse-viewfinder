@@ -318,9 +318,9 @@ def script(max_radius=MAX_RADIUS_KM):
     var risk='';
     if(p.total && p.dur < 30){
       var tip='Con '+n(p.dur,0)+' s est\u00e1s en el filo de la sombra. Mi c\u00e1lculo '+
-        'tiene un sesgo de \u00b13 s y no modela el perfil real del limbo lunar '+
-        '(los montes del borde de la Luna), que justo aqu\u00ed es lo que decide entre '+
-        'ver corona y no verla: podr\u00edan ser 0 s. Para un cazador de eclipses el '+
+        'cuadra con el IGN dentro de 1 s, pero no modela el perfil real del limbo '+
+        'lunar (los montes del borde de la Luna), que justo aqu\u00ed es lo que decide '+
+        'entre ver corona y no verla: podr\u00edan ser 0 s. Para un cazador de eclipses el '+
         'riesgo compensa, porque unos segundos de corona no se parecen a nada. Para un '+
         'plan en familia, un parcial casi seguro con mejor margen suele ser mejor '+
         'idea. Moverse unos kil\u00f3metros hacia el centro de la franja lo resuelve.';
