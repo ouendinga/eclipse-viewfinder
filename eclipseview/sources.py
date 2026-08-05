@@ -82,12 +82,19 @@ REFERENCE_CITIES = [
 
 # Independently reported for the northern edge of the path (a decision-relevant claim:
 # it is what makes totality reachable from the Barcelona area at all).
+# Antes citaba al Diari de Tarragona "1 m 02 s". Comprobado el 2026-08-05 abriendo el
+# artículo: dice "alrededor de 55 segundos". O sea, la cita no sostenía la cifra, y con
+# una tolerancia de 8 s ninguna de las dos versiones hacía saltar el aviso. Se sustituye
+# por la ficha oficial del IGN para el municipio, que además trae las coordenadas y la
+# altitud exactas a las que están calculadas sus cifras -- compararlas en otro punto
+# era otra fuente de error escondida.
 REFERENCE_EDGE = [
-    {'name': 'Tarragona', 'lat': 41.1190, 'lon': 1.2450, 'elev': 20,
-     'duration_s': 62, 'tolerance_s': 8,
-     'source_label': 'Diari de Tarragona (1 m 02 s)',
-     'source_url': 'https://www.diaridetarragona.com/tarragona/258007/'
-                   'mapa-podras-ver-eclipse-sol-casa-provincia-tarragona.html'},
+    {'name': 'Tarragona', 'lat': 41.11910, 'lon': 1.25842, 'elev': 69,
+     'duration_s': 59, 'tolerance_s': 8,
+     'sun_alt_deg': 4.2, 'sun_az_deg': 286.0, 'tolerance_alt_deg': 0.5,
+     'source_label': 'IGN — ficha de Tarragona (totalidad 0 m 59 s, Sol a 4,2°)',
+     'source_url': 'https://eclipses.ign.es/src/img/eclipse-26/infografia/'
+                   '43148_Tarragona_Tarragona.jpg'},
 ]
 
 # Barcelona is outside the umbra. Worth asserting because it is the single fact most

@@ -64,13 +64,20 @@ def check_edge():
     out = []
     for e in sources.REFERENCE_EDGE:
         c = circumstances(e['lat'], e['lon'], e['elev'])
-        out.append(dict(
-            name=e['name'], detail=e['source_label'],
-            items=[dict(what='duración', ours=round(c['duration_s'], 1),
-                        published=e['duration_s'], unit='s', tol=e['tolerance_s'],
-                        ok=(c['total'] and
-                            abs(c['duration_s'] - e['duration_s']) <= e['tolerance_s']))],
-            source_url=e['source_url']))
+        items = [dict(what='duración', ours=round(c['duration_s'], 1),
+                      published=e['duration_s'], unit='s', tol=e['tolerance_s'],
+                      ok=(c['total'] and
+                          abs(c['duration_s'] - e['duration_s']) <= e['tolerance_s']))]
+        # La altura del Sol es la comprobación que aprieta: la duración arrastra el
+        # sesgo conocido del convenio de radio lunar, la altura no.
+        if e.get('sun_alt_deg') is not None:
+            tol = e.get('tolerance_alt_deg', 0.5)
+            items.append(dict(
+                what='altura del Sol', ours=round(c['max_alt_app'], 2),
+                published=e['sun_alt_deg'], unit='°', tol=tol,
+                ok=abs(c['max_alt_app'] - e['sun_alt_deg']) <= tol))
+        out.append(dict(name=e['name'], detail=e['source_label'], items=items,
+                        source_url=e['source_url']))
     return out
 
 
