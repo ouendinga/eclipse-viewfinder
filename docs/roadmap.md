@@ -49,6 +49,28 @@ Lo calculado está bien; lo que falla es cómo se presenta y qué falta comproba
   OpenStreetMap y Street View apuntando al azimut del Sol.
 - Aviso de que son puntos del terreno: hay que comprobar acceso y finca privada.
 
+
+## Estado al cerrar la sesión del 2026-08-05
+
+**En producción**: https://eclipse.alvarosolis.dev — 1.469 miradores, 1.067 con árboles
+y edificios comprobados, 24 tests verdes, verificación 13/13.
+
+### ⚠️ Trabajo a medias (lo primero al retomar)
+- **Chequeo de accesibilidad interrumpido en ~375/1467.** `./access.sh` lo reanuda: la
+  caché de Overpass conserva lo hecho, así que solo consulta lo que falta (~80 min).
+  El código que lo consume (`finder_ui.py`: `acc_label`, `acc_class` y el texto de
+  acceso) **está escrito pero nunca se ha desplegado ni visto en pantalla**.
+- **`site/index.html` está sin reconstruir** con esos cambios y con las secciones nuevas
+  de «Aviso» y «Fuentes» de `overview.py`. Reconstruir con `./redeploy.sh` (~15 min,
+  recalcula el informe general).
+
+### 🔲 Pendiente de la fase «mejorar la visión»
+- 402 puntos (28 %) sin chequear contra árboles y edificios: `./enrich.sh`, ~10 min.
+- Alturas de arbolado estimadas (18 m): OSM casi nunca las trae.
+- Topónimos pobres en unos pocos puntos («España» a secas): bajar el zoom de la
+  geocodificación inversa y reintentar solo esos.
+- Perfil real del limbo lunar: es lo que decide entre 6 s y nada en el borde.
+
 ## Objetivo total
 
 **Cualquier eclipse, en cualquier parte del mundo, en varios idiomas.**
