@@ -260,6 +260,25 @@ def script(max_radius=MAX_RADIUS_KM):
       'Son puntos del <b>terreno</b>: comprueba en el mapa que se llega y que no es '+
       'finca privada.</p>'+
       hits.slice(0,8).map(card).join('');
+    pideNubes(hits.slice(0,8).map(function(h){return h.p;}));
+  }
+
+  // El pronóstico llega después de pintar: la ficha no se queda esperando a un tercero.
+  // Si no llega, el hueco se queda en "sin pronóstico", que es la verdad.
+  function pideNubes(puntos){
+    if(!window.fcPide||!puntos.length) return;
+    window.fcPide(puntos).then(function(pcts){
+      if(pcts===null){                       // demasiado lejos para que signifique algo
+        [].forEach.call(res.querySelectorAll('.fcslot'),function(el){
+          el.querySelector('.v').innerHTML='<span class="fc"><span class="v">—</span>'+
+            '<span class="u">aún lejos</span></span>';});
+        return;
+      }
+      puntos.forEach(function(p,i){
+        var el=res.querySelector('.fcslot[data-fc="'+p.i+'"]');
+        if(el) el.querySelector('.v').innerHTML=window.fcHtml(pcts&&pcts[i]);
+      });
+    });
   }
 
   // Margen neto: terreno + lo que haya plantado encima. Si no se pudo comprobar, se
@@ -336,6 +355,10 @@ def script(max_radius=MAX_RADIUS_KM):
         num('árboles/edificios', p.obs_ok ? (p.obs>0? deg(p.obs,2,true) : 'nada') : 'sin comprobar',
             p.obs_ok ? '' : 'no')+
         num('acceso', acc_label(p), acc_class(p))+
+        // el hueco del pronóstico: se rellena cuando llega, o se queda en "—". Nunca
+        // se inventa un valor mientras tanto.
+        '<div class="num fcslot" data-fc="'+p.i+'"><div class="k">nubes (pron.)</div>'+
+        '<div class="v">'+(window.fcHtml?window.fcHtml(undefined):'—')+'</div></div>'+
       '</div>'+
       '<div class="panowrap">'+pano(p)+'</div>'+
       '<div class="why">'+why(p,h.d)+

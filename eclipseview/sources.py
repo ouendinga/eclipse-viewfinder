@@ -56,6 +56,10 @@ CITATIONS = {
         'label': 'Overpass API / OpenStreetMap',
         'url': 'https://overpass-api.de/',
     },
+    'open_meteo': {
+        'label': 'Open-Meteo',
+        'url': 'https://open-meteo.com/',
+    },
 }
 
 # --------------------------------------------------------------- verification

@@ -13,7 +13,7 @@ import os
 
 import numpy as np
 
-from . import i18n, minimap, roster, sources, verify
+from . import countdown, forecast, i18n, minimap, roster, sources, verify
 from .analysis import evaluate, km, path_limits, zone_stats
 from .paths import MAP_SVG, SCAN_PKL
 from .report import esc, _num, _margin_class, _td_class, site_note
@@ -219,6 +219,13 @@ def render(data, finder_html='', finder_css='', finder_js=''):
     scan = data['scan']
     lim = data['limits']
 
+    # La cuenta atrás apunta a la primera totalidad que se ve en España, y ese minuto
+    # sale de los sitios calculados, no escrito a mano: si se recalculan, cambia solo.
+    t2s = sorted(r['c2_local'][:5] for r in s.values()
+                 if r['total'] and r.get('c2_local'))
+    cd_html = countdown.html(t2s[0]) if t2s else ''
+    hora_totalidad = int(t2s[0][:2]) if t2s else 20
+
     alt_hi = max(r['alt_start'] for r in s.values())
     alt_lo = min(r['alt'] for r in s.values())
     az_lo = min(r['az'] for r in s.values())
@@ -257,9 +264,11 @@ def render(data, finder_html='', finder_css='', finder_js=''):
   (oeste-noroeste). A esa altura, una loma a 3 km o una sierra a 80 km se lo come.
   He calculado la geometría del eclipse y el perfil real del terreno en esa dirección
   para <b>{scanned} puntos</b> de la franja.</p>
+  {cd_html}
 </header>
 
 {finder_html}
+{forecast.note_html()}
 
 <section>
   <h2>Lo esencial</h2>
@@ -348,8 +357,10 @@ def render(data, finder_html='', finder_css='', finder_js=''):
         {sources.cite('srtm')}</td><td>dominio público</td></tr>
     <tr><td>Árboles, edificios y vías de acceso</td><td>{sources.cite('overpass')}</td><td>ODbL</td></tr>
     <tr><td>Topónimos</td><td>{sources.cite('osm')}</td><td>ODbL</td></tr>
-    <tr><td>Nubosidad de agosto</td><td>{sources.cite('eclipsophile')}</td><td>citada, no
-        redistribuida</td></tr>
+    <tr><td>Nubosidad de agosto (climatología, lo que <i>suele</i> pasar)</td>
+        <td>{sources.cite('eclipsophile')}</td><td>citada, no redistribuida</td></tr>
+    <tr><td>Nubes previstas para la hora de la totalidad (<b>pronóstico</b>, cambia
+        cada día)</td><td>{sources.cite('open_meteo')}</td><td>CC BY 4.0</td></tr>
     <tr><td>Contraste de los cálculos</td><td>{sources.cite('ign')} y {sources.cite('nasa_gsfc')}</td><td>citadas</td></tr>
   </tbody></table></div>
   <p class="caption">El código es público y la metodología está escrita:
@@ -406,7 +417,9 @@ def render(data, finder_html='', finder_css='', finder_js=''):
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%2213%22 fill=%22%23e08a2e%22/%3E%3Ccircle cx=%2221%22 cy=%2213%22 r=%2213%22 fill=%22%230e131a%22/%3E%3C/svg%3E">
 <style>{CSS}
 {finder_css}
-{minimap.CSS}</style></head><body>
+{minimap.CSS}
+{countdown.CSS}
+{forecast.CSS}</style></head><body>
 {minimap.html()}
 <div class="wrap">{body}
 <footer><p>Efemérides {sources.cite('de421')} · relieve {sources.cite('srtm')} ·
@@ -415,8 +428,10 @@ topónimos {sources.cite('osm')} · contraste con {sources.cite('ign')} y
 <a href="https://github.com/ouendinga/eclipse-viewfinder">Código y metodología</a>.
 Hecho por <a href="https://alvarosolis.dev">Álvaro Solís</a>.</p></footer>
 </div>
+{forecast.script(sources.EVENT['date'], hora_totalidad)}
 {finder_js}
 {minimap.script()}
+{countdown.script()}
 <!-- Vercel Web Analytics: sin cookies y sin datos personales, así que no hace falta
      banner de consentimiento. Se sirve desde el propio dominio, no desde un tercero.
      Requiere tenerlo activado en el panel del proyecto (ver docs/pending-human.md);
