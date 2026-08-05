@@ -62,14 +62,15 @@ class TestEphemeris(unittest.TestCase):
                                 f"{item['what']}: {item['ours']} vs "
                                 f"{item['published']} {item['unit']}")
 
-    def test_duration_bias_is_documented(self):
-        """Our lunar-radius convention runs long. Assert the bias stays SMALL and
-        POSITIVE, so a regression that flips or inflates it is caught."""
+    def test_duration_bias_is_small(self):
+        """Antes este test daba por bueno un sesgo POSITIVO de hasta el 5 %, porque el
+        radio lunar era el medio y las duraciones salían largas. Con el radio umbral
+        calibrado el sesgo ya no tiene signo esperado: lo que se exige es que sea
+        pequeño en SEGUNDOS, que es lo que le importa a quien va a ver el eclipse."""
         r = sources.REFERENCE_GREATEST
         c = circumstances(r['lat'], r['lon'], 0.0)
-        bias = (c['duration_s'] - r['duration_s']) / r['duration_s']
-        self.assertGreater(bias, 0.0)
-        self.assertLess(bias, 0.05, 'el sesgo de duración se ha disparado')
+        self.assertLessEqual(abs(c['duration_s'] - r['duration_s']),
+                             sources.LUNAR_UMBRAL_RADIUS['max_dev_s'])
 
     def test_cities_match_ign(self):
         for g in verify.check_cities():
@@ -274,6 +275,49 @@ class TestStreetViewNeedsARoad(unittest.TestCase):
         p['sv'] = 'https://maps.google.com/…'
         recommend.apply_streetview([p])
         self.assertNotIn('sv', p)
+
+
+class TestLunarRadiusCalibration(unittest.TestCase):
+    """El radio umbral no se copia de ningún sitio: se ajusta a las duraciones
+    publicadas (NASA e IGN). Este test rehace el ajuste, así que si alguien toca el
+    valor a ojo o cambia el motor, salta."""
+
+    def _refs(self):
+        r = sources.REFERENCE_GREATEST
+        out = [(r['lat'], r['lon'], 0.0, r['duration_s'])]
+        for x in sources.REFERENCE_CITIES + sources.REFERENCE_EDGE:
+            out.append((x['lat'], x['lon'], x['elev'], x['duration_s']))
+        return out
+
+    def _worst(self, radius_km):
+        from eclipseview import ephem
+        antes = ephem.R_MOON_KM
+        ephem.R_MOON_KM = radius_km
+        try:
+            return max(abs(ephem.circumstances(la, lo, el)['duration_s'] - pub)
+                       for la, lo, el, pub in self._refs())
+        finally:
+            ephem.R_MOON_KM = antes
+
+    def test_shipped_radius_meets_its_own_tolerance(self):
+        cal = sources.LUNAR_UMBRAL_RADIUS
+        peor = self._worst(cal['km'])
+        self.assertLessEqual(peor, cal['max_dev_s'],
+                             f'con {cal["km"]} km el peor desvío es {peor:.2f} s')
+
+    def test_no_neighbour_on_the_grid_is_better(self):
+        """Que sea un mínimo de verdad y no un número puesto a dedo que casualmente
+        cumple la tolerancia."""
+        cal = sources.LUNAR_UMBRAL_RADIUS
+        aqui = self._worst(cal['km'])
+        for lado in (-cal['step_km'], +cal['step_km']):
+            self.assertLessEqual(aqui, self._worst(cal['km'] + lado) + 1e-9,
+                                 f'{cal["km"] + lado} km ajusta mejor')
+
+    def test_it_actually_beats_the_mean_radius(self):
+        """El guardia probado por el lado que importa: el radio medio (lo que había)
+        tiene que fallar esta tolerancia, o el test no está midiendo nada."""
+        self.assertGreater(self._worst(1737.4), sources.LUNAR_UMBRAL_RADIUS['max_dev_s'])
 
 
 class TestOverpassIsPolite(unittest.TestCase):

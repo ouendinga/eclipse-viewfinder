@@ -106,6 +106,32 @@ REFERENCE_PARTIAL = [
 # Published umbral width, for a sanity check on our bisected limits.
 REFERENCE_PATH_WIDTH_KM = {'value': 294, 'tolerance': 25, 'source': 'nasa_gsfc'}
 
+# ------------------------------------------------- radio lunar umbral calibrado
+#
+# El radio con el que se calcula la totalidad NO es el radio medio de la Luna. El limbo
+# real tiene montañas y valles, y la sombra la define el perfil, no una esfera. Las
+# predicciones publicadas usan por eso un radio efectivo algo menor para los contactos
+# umbrales.
+#
+# Aquí no se adopta una constante de fuera —se buscó la de NASA GSFC y su página no
+# publica el valor en texto, y una cita que no sostiene su cifra es peor que ninguna—,
+# sino que se CALIBRA contra las cifras publicadas que ya están citadas arriba:
+# REFERENCE_GREATEST (NASA) y las fichas municipales del IGN (REFERENCE_CITIES y
+# REFERENCE_EDGE). O sea, lo calcula el código a partir de datos citados, y hay un test
+# que rehace el ajuste y comprueba que el valor publicado aquí sigue siendo el mejor.
+#
+# Medido el 2026-08-05 con las cuatro referencias (59 s a 138 s de totalidad):
+#   1737,4 km (lo que había, sin convenio declarado) -> +3,39 s de media, 4,70 s el peor
+#   1736,65 km (k=0,272281, convenio umbral usado por Espenak) -> +1,53 s / 2,45 s
+#   1736,0 km (este ajuste) -> -0,08 s de media, 0,59 s el peor
+LUNAR_UMBRAL_RADIUS = {
+    'km': 1736.0,
+    'step_km': 0.2,          # la rejilla con la que se buscó; el test la reusa
+    'max_dev_s': 1.0,        # desviación máxima admitida contra las referencias
+    'method': ('ajustado a las duraciones publicadas por NASA GSFC y el IGN; '
+               'ver tests/test_engine.py::TestLunarRadiusCalibration'),
+}
+
 # --------------------------------------------------------------- climatology
 
 # August cloud prospects along the Spanish track. These are QUOTED, not computed.

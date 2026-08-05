@@ -16,8 +16,12 @@ from skyfield.framelib import ecliptic_frame  # noqa: F401  (ensures full instal
 from .paths import EPHEM_DIR
 
 R_SUN_KM = 695700.0
-# Standard eclipse-prediction lunar radius (k = 0.2725076 * equatorial Earth radius)
-R_MOON_KM = 1737.4
+# Radio lunar efectivo para los contactos umbrales. NO es el radio medio (1737,4 km,
+# que además era lo que había con un comentario equivocado: decía k = 0,2725076, que
+# son 1738,09 km). El limbo real tiene montañas y valles, así que la totalidad dura
+# menos de lo que da una esfera media. El valor y su calibración están en sources.py.
+from .sources import LUNAR_UMBRAL_RADIUS      # noqa: E402
+R_MOON_KM = LUNAR_UMBRAL_RADIUS['km']
 
 _loader = Loader(EPHEM_DIR)
 _eph = _loader('de421.bsp')
