@@ -10,10 +10,20 @@ Actualizado: 2026-08-05
       legales por transferencias) y Cloudflare Web Analytics (su única ventaja es un
       límite que no se va a rozar).
 
-- [ ] **Activar Web Analytics en el panel de Vercel** — esto no lo puede hacer el código.
-      Proyecto `eclipse-viewfinder` → pestaña **Analytics** → **Enable**. Hasta que se
-      pulse, el script devuelve 404 (la página funciona igual) y **no se registra ninguna
-      visita**. Las que trajo WhatsApp ya se perdieron y no son recuperables.
+- [ ] **Comprobar Web Analytics después del próximo despliegue.** El proyecto ya trae
+      `webAnalytics: {id: sN0eYCVt4ckH2TElaDfAmQ5Y8}` en su configuración (consultado por
+      API el 2026-08-05), pero `https://eclipse.alvarosolis.dev/_vercel/insights/script.js`
+      responde **404**, así que no se puede dar por activa. La página en producción
+      tampoco lleva todavía el script.
+      Tras el `redeploy.sh`: si el script sigue dando 404, hay que entrar a
+      `vercel.com/ouendingas-projects/eclipse-viewfinder/analytics` y pulsar **Enable**.
+      Las visitas que trajo WhatsApp ya se perdieron y no son recuperables.
+
+- [ ] **Averiguar si los 50.000 eventos/mes del plan Hobby son por proyecto o por cuenta.**
+      Hay **cinco** proyectos con analítica en la cuenta (`eclipse-viewfinder`,
+      `alvarosolis`, `kynex-web`, `kynex-construccion`, `folio-doctor`). Si el límite es
+      de cuenta, un pico del eclipse se come la cuota de todos. **Sin verificar**: el dato
+      de 50.000 está comprobado en la documentación, el reparto no.
 
 - [ ] **¿Registrar las localidades buscadas?** Requiere Vercel Pro (20 $/mes) o el truco
       de leer la query string (`?n=Malgrat+de+Mar`), que está **sin verificar**. Además
