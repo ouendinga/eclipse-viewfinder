@@ -14,7 +14,9 @@ CACHE = LIMITS_JSON
 
 
 def solve(lon):
-    from eclipse import circumstances
+    # Dentro del worker por lo del mmap de las efemérides. Ponía `from eclipse import`,
+    # un módulo que no existe: el mismo fallo que había en field_build.py.
+    from .ephem import circumstances
 
     def total(la):
         return circumstances(float(la), float(lon), 0.0, coarse_step_s=120.0)['total']
