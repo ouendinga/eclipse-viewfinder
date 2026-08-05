@@ -187,7 +187,7 @@ def script(max_radius=MAX_RADIUS_KM):
     }).filter(function(h){return h.d<=rad;});
     hits.sort(function(a,b){
       if(b.p.total!==a.p.total) return b.p.total-a.p.total;
-      return b.p.clear-a.p.clear;});
+      return net(b.p)-net(a.p);});
 
     var url=new URL(location); url.searchParams.set('lat',ORIGIN.lat.toFixed(4));
     url.searchParams.set('lon',ORIGIN.lon.toFixed(4));
@@ -211,8 +211,13 @@ def script(max_radius=MAX_RADIUS_KM):
     res.innerHTML=hits.slice(0,8).map(card).join('');
   }
 
+  // Margen neto: terreno + lo que haya plantado encima. Si no se pudo comprobar, se
+  // queda en el del terreno y la ficha lo dice: un dato que falta no puede aparentar
+  // ser un dato bueno.
+  function net(p){ return (p.clear_net!==undefined && p.obs_ok) ? p.clear_net : p.clear; }
+
   function card(h){
-    var p=h.p, cl=p.clear;
+    var p=h.p, cl=net(p);
     var mc=cl>=2?'ok':(cl<0?'no':'w'), bc=p.total?'g':(cl>=2?'w':'b');
     var badge=p.total?('TOTALIDAD '+n(p.dur,0)+' s'):(n(p.obsc,1)+'% parcial');
     function num(k,v,c){return '<div class="num '+(c||'')+'"><div class="k">'+k+
@@ -229,6 +234,8 @@ def script(max_radius=MAX_RADIUS_KM):
         num('horizonte real',deg(p.hz,2,true))+
         num('margen libre',deg(cl,2,true),mc)+
         num('hora',(p.t2||p.t))+
+        num('árboles/edificios', p.obs_ok ? (p.obs>0? deg(p.obs,2,true) : 'nada') : 'sin comprobar',
+            p.obs_ok ? '' : 'no')+
       '</div>'+
       '<div class="panowrap">'+pano(p)+'</div>'+
       '<div class="why">'+why(p,h.d)+'</div></article>';
@@ -245,7 +252,16 @@ def script(max_radius=MAX_RADIUS_KM):
       ' veces el diámetro del Sol.';
     if(p.total) s+=' Aquí hay <b>totalidad: '+n(p.dur,0)+' s</b>, de '+p.t2+' a '+p.t3+'.';
     else s+=' Eclipse <b>parcial</b>: '+n(p.obsc,2)+'% del disco oculto, sin corona.';
-    return s+' A '+n(d,1)+' km en línea recta.';
+    if(p.obs_ok && p.obs>0 && p.obs_what){
+      s+=' Ojo: hay <b>'+esc(p.obs_what)+'</b> de unos '+n(p.obs_h,0)+' m a '+
+         n(p.obs_d,0)+' m, que levanta el horizonte a '+deg(p.obs,2,true)+
+         (p.obs_meas?' (altura del mapa)':' (altura estimada)')+'.';
+    } else if(!p.obs_ok){
+      s+=' <b>Árboles y edificios sin comprobar</b> en este punto: el margen es solo el del terreno.';
+    }
+    s+=' A '+n(d,1)+' km en línea recta.';
+    if(p.sv) s+=' <a href="'+p.sv+'" target="_blank" rel="noopener">Verlo en Street View mirando al Sol \u2197</a>';
+    return s;
   }
 
   // Panorama dibujado en el navegador desde el perfil compacto: mismo diseño que el

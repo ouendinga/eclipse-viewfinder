@@ -143,27 +143,15 @@ def build(out_path=None, progress=None, geocode=True, event=None,
             moon=[round(d_az, 4), round(d_alt, 4), round(r_sun, 4), round(r_moon, 4)],
         ))
 
+    # Checkpoint antes de tocar nada externo. Los horizontes cuestan ~40 min de CPU y
+    # no se pueden perder porque un servicio ajeno esté caído.
+    _dump(out_path, ev, points)
+
     if check_obstacles:
         # The DEM's blind spot, filled from OpenStreetMap: trees and buildings in the
         # sight line. The IGN's visualiser states it ignores both; this is where we
         # can actually do better rather than just finer.
-        lookup = lambda a, b: float(elev_fine(a, b)[0])          # noqa: E731
-        for k, p in enumerate(points, 1):
-            if progress and k % 5 == 0:
-                progress(k, len(points), 'buscando árboles y edificios (OSM)')
-            o = obstacles.check(p['lat'], p['lon'], p['az'], p['elev'],
-                                elev_lookup=lookup)
-            p['obs'] = round(o.get('angle', 0.0), 2)
-            p['obs_ok'] = bool(o.get('ok'))
-            w = o.get('worst')
-            if w:
-                p['obs_what'] = w['kind']
-                p['obs_d'] = w['dist_m']
-                p['obs_h'] = w['height_m']
-                p['obs_meas'] = w['measured']
-            # clearance after accounting for what is standing on the ground
-            p['clear_net'] = round(min(p['clear'], p['alt'] - max(p['hz'], p['obs'])), 2)
-            p['sv'] = obstacles.streetview_url(p['lat'], p['lon'], p['az'])
+        enrich_obstacles(points, progress=progress)
 
     if geocode:
         for k, p in enumerate(points, 1):
@@ -171,18 +159,56 @@ def build(out_path=None, progress=None, geocode=True, event=None,
                 progress(k, len(points), 'poniendo nombres')
             p['place'] = gazetteer.reverse(p['lat'], p['lon'])
 
+    meta = _dump(out_path, ev, points)
+    return out_path, meta
+
+
+def enrich_obstacles(points, progress=None):
+    """Add the trees-and-buildings check to points already computed.
+
+    Kept separate and resumable on purpose: the public Overpass instances go down or
+    saturate (observed: HTTP 504 "server too busy" on one, no answer at all on two
+    others), and a viewpoint dataset must not depend on a third party being healthy at
+    the moment it is built. Points not checked keep obs_ok=False, which the interface
+    must render as "sin comprobar" -- never as "clear".
+    """
+    lookup = lambda a, b: float(elev_fine(a, b)[0])          # noqa: E731
+    items = [(p['lat'], p['lon'], p['az'], p['elev']) for p in points]
+    res = obstacles.check_batch(items, elev_lookup=lookup, progress=progress)
+    n_ok = 0
+    for p, o in zip(points, res):
+        p['sv'] = obstacles.streetview_url(p['lat'], p['lon'], p['az'])
+        if not o or not o.get('ok'):
+            p['obs_ok'] = False
+            p.setdefault('obs', 0.0)
+            p['clear_net'] = p['clear']      # sin comprobar, no "limpio"
+            continue
+        n_ok += 1
+        p['obs'] = round(o.get('angle', 0.0), 2)
+        p['obs_ok'] = True
+        w = o.get('worst')
+        if w:
+            p['obs_what'] = w['kind']; p['obs_d'] = w['dist_m']
+            p['obs_h'] = w['height_m']; p['obs_meas'] = w['measured']
+        p['clear_net'] = round(min(p['clear'], p['alt'] - max(p['hz'], p['obs'])), 2)
+    return n_ok
+
+
+def _dump(out_path, ev, points, extra=None):
     meta = dict(
-        event=ev.key, event_label=ev.label, date=ev.iso_date,
-        tz_label=ev.tz_label,
+        event=ev.key, event_label=ev.label, date=ev.iso_date, tz_label=ev.tz_label,
         az_lo=AZ_LO, az_hi=AZ_HI, az_step=AZ_STEP,
         min_clear=MIN_CLEAR, sep_km=SEP_KM, n=len(points),
+        n_obs_checked=sum(1 for p in points if p.get('obs_ok')),
         note=('Puntos recomendados precalculados para este eclipse. Buscar por '
               'localidad y radio es un filtro sobre este conjunto: no se calcula '
               'nada en vivo.'))
+    if extra:
+        meta.update(extra)
     with open(out_path, 'w') as f:
         json.dump(dict(meta=meta, points=points), f, ensure_ascii=False,
                   separators=(',', ':'))
-    return out_path, meta
+    return meta
 
 
 def _ts_utc(ev, minutes_from_mid):

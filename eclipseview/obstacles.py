@@ -57,6 +57,33 @@ LEVEL_HEIGHT_M = 3.0
 
 _last = [0.0]
 _cache = None
+_healthy = None
+
+
+def healthy_endpoints(force=False, timeout=20):
+    """Probe the endpoints once and keep only the ones answering.
+
+    Without this, every failure walks the full rotation and burns a socket timeout on
+    each dead host: with two of three down, a single retry cost ~50 s of nothing.
+    """
+    global _healthy
+    if _healthy is not None and not force:
+        return _healthy
+    probe = ('[out:json][timeout:10];way["building"](41.65,2.73,41.66,2.74);'
+             'out ids;')
+    ok = []
+    for url in OVERPASS_ENDPOINTS:
+        try:
+            req = urllib.request.Request(
+                url, data=urllib.parse.urlencode({'data': probe}).encode(),
+                headers={'User-Agent': UA})
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                json.load(r)
+            ok.append(url)
+        except Exception:
+            pass
+    _healthy = ok or list(OVERPASS_ENDPOINTS)   # all down: try anyway, and fail fast
+    return _healthy
 
 
 def _load():
@@ -104,9 +131,10 @@ def _bbox(lat, lon, az_deg, reach_m=CORRIDOR_M, pad_m=HALF_WIDTH_M):
 
 def _query(bbox, timeout=90, tries=4):
     """Ask Overpass, rotating endpoints and backing off on rate limits."""
+    eps = healthy_endpoints()
     last = None
     for attempt in range(tries):
-        url = OVERPASS_ENDPOINTS[attempt % len(OVERPASS_ENDPOINTS)]
+        url = eps[attempt % len(eps)]
         try:
             return _query_one(url, bbox, timeout)
         except urllib.error.HTTPError as e:
@@ -169,6 +197,109 @@ def _along(lat, lon, az_deg, tlat, tlon):
     along = dy * math.cos(az) + dx * math.sin(az)
     across = abs(-dy * math.sin(az) + dx * math.cos(az))
     return along, across
+
+
+def check_batch(items, elev_lookup=None, batch=25, progress=None,
+                min_dist_m=40.0, timeout=45):
+    """Corridors for MANY viewpoints in one Overpass request.
+
+    One request per point does not survive contact with the public Overpass instances:
+    they start refusing, every attempt then burns its full socket timeout, and the run
+    stops advancing altogether. A union of N corridor bboxes returns the same features
+    in a single, still-small response, which cuts ~1750 requests to ~70.
+
+    `items` is a sequence of (lat, lon, az_deg, obs_elev). Returns a list of results
+    in the same order.
+    """
+    cache = _load()
+    out = [None] * len(items)
+    todo = []
+    for i, (lat, lon, az, elev) in enumerate(items):
+        key = f'{lat:.4f},{lon:.4f},{az:.0f}'
+        if key in cache:
+            out[i] = cache[key]
+        else:
+            todo.append(i)
+
+    for start in range(0, len(todo), batch):
+        chunk = [todo[k] for k in range(start, min(start + batch, len(todo)))]
+        boxes = [_bbox(*items[i][:3]) for i in chunk]
+        if progress:
+            progress(start + len(chunk), len(todo), 'OSM por lotes')
+        try:
+            data = _query_multi(boxes, timeout=timeout)
+        except Exception as e:
+            for i in chunk:
+                out[i] = dict(ok=False, error=str(e)[:120], angle=0.0)
+            continue
+        elements = data.get('elements', [])
+        for i in chunk:
+            lat, lon, az, elev = items[i]
+            res = _evaluate(elements, lat, lon, az, elev, elev_lookup, min_dist_m)
+            key = f'{lat:.4f},{lon:.4f},{az:.0f}'
+            cache[key] = res
+            out[i] = res
+        _save()
+    return out
+
+
+def _query_multi(boxes, timeout=45, tries=3):
+    """One request, many bboxes. Same rotation and backoff as the single version."""
+    parts = []
+    for (s, w, n, e) in boxes:
+        parts.append(f'way["building"]({s},{w},{n},{e});')
+        parts.append(f'way["natural"~"^(wood|scrub)$"]({s},{w},{n},{e});')
+        parts.append(f'way["landuse"~"^(forest|orchard|vineyard)$"]({s},{w},{n},{e});')
+    q = f'[out:json][timeout:{timeout}];(' + ''.join(parts) + ');out tags center;'
+    eps = healthy_endpoints()
+    last = None
+    for attempt in range(tries):
+        url = eps[attempt % len(eps)]
+        try:
+            req = urllib.request.Request(
+                url, data=urllib.parse.urlencode({'data': q}).encode(),
+                headers={'User-Agent': UA})
+            _throttle()
+            # Short socket timeout on purpose: a refusing endpoint must fail fast so
+            # the next one gets tried, instead of stalling the whole run.
+            with urllib.request.urlopen(req, timeout=timeout + 15) as r:
+                return json.load(r)
+        except Exception as e:
+            last = e
+            time.sleep(2.0 * (attempt + 1))
+    raise last
+
+
+def _evaluate(elements, lat, lon, az_deg, obs_elev, elev_lookup, min_dist_m):
+    """Turn OSM features into the worst obstruction angle for one viewpoint."""
+    h0 = obs_elev + EYE_H
+    worst, n_seen = None, 0
+    for el in elements:
+        c = el.get('center') or {}
+        if 'lat' not in c:
+            continue
+        along, across = _along(lat, lon, az_deg, c['lat'], c['lon'])
+        if along < min_dist_m or along > CORRIDOR_M or across > HALF_WIDTH_M:
+            continue
+        tags = el.get('tags', {})
+        h, measured = _height(tags)
+        if not h:
+            continue
+        ground = (elev_lookup(c['lat'], c['lon']) if elev_lookup else obs_elev)
+        ang = math.degrees(math.atan2(ground + h - h0, along))
+        # Below the horizontal it cannot hide anything: reporting "worst obstacle: a
+        # building at -13 deg" would be noise dressed as a finding.
+        if ang <= 0:
+            continue
+        n_seen += 1
+        if worst is None or ang > worst['angle']:
+            worst = dict(angle=round(ang, 2), dist_m=round(along),
+                         height_m=round(h, 1), measured=measured,
+                         kind=(tags.get('natural') or tags.get('landuse')
+                               or ('building:' + str(tags.get('building')))),
+                         name=tags.get('name'))
+    return dict(ok=True, n=n_seen, angle=(worst['angle'] if worst else 0.0),
+                worst=worst)
 
 
 def check(lat, lon, az_deg, obs_elev, elev_lookup=None, use_cache=True,
