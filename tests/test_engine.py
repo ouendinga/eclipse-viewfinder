@@ -11,7 +11,7 @@ import unittest
 
 import numpy as np
 
-from eclipseview import events, i18n, sources, verify
+from eclipseview import events, gazetteer, i18n, recommend, sources, verify
 from eclipseview.ephem import _overlap_fraction, circumstances
 from eclipseview.paths import MOSAIC_NPY, FIELD_PKL
 
@@ -201,6 +201,50 @@ class TestSourcesIntegrity(unittest.TestCase):
         self.assertIn(sources.CLIMATOLOGY['source'], sources.CITATIONS)
         for r in sources.CLIMATOLOGY['regions']:
             self.assertTrue(r['label'] and r['text'])
+
+
+class TestOffshoreIsNotRecommended(unittest.TestCase):
+    """Sobre el mar el DEM vale 0 y el horizonte sale perfecto: si no se filtra, los
+    mejores márgenes del sitio caen en mar abierto. Etiquetas reales observadas en
+    Nominatim el 2026-08-05."""
+
+    def test_country_only_is_not_land(self):
+        for label in ('', 'España', ' españa ', 'Spain', 'Portugal'):
+            with self.subTest(label):
+                self.assertFalse(gazetteer.on_land(label))
+
+    def test_real_places_are_land(self):
+        for label in ('O Porto de Corme, Ponteceso, Bergantiños',
+                      'Navas de San Antonio, Castilla y León',
+                      'Asturias', 'País Vasco'):
+            with self.subTest(label):
+                self.assertTrue(gazetteer.on_land(label))
+
+    def test_drop_offshore_prunes_and_renumbers(self):
+        pts = [dict(i=1, place='Cuéllar, Castilla y León'),
+               dict(i=2, place='España'),
+               dict(i=3, place=''),
+               dict(i=4, place='Soria, Castilla y León')]
+        kept = recommend.drop_offshore(pts, retry=False)
+        self.assertEqual([p['place'] for p in kept],
+                         ['Cuéllar, Castilla y León', 'Soria, Castilla y León'])
+        self.assertEqual([p['i'] for p in kept], [1, 2])
+
+    def test_coastal_point_survives_the_finer_zoom(self):
+        """Gorliz salía «España» al zoom 13 y es tierra: la segunda consulta lo salva
+        y le arregla el topónimo. Sin esta red, el filtro borra costa de verdad."""
+        pts = [dict(i=1, lat=43.44, lon=-2.94, place='España'),   # Gorliz, Bizkaia
+               dict(i=2, lat=43.59, lon=-4.69, place='España')]   # mar cantábrico
+        fine = {(43.44, -2.94): 'Gorliz, Bizkaia, Euskadi',
+                (43.59, -4.69): 'España'}
+        real = gazetteer.reverse
+        gazetteer.reverse = lambda la, lo, **kw: fine[(la, lo)]
+        try:
+            kept = recommend.drop_offshore(pts)
+        finally:
+            gazetteer.reverse = real
+        self.assertEqual(len(kept), 1)
+        self.assertEqual(kept[0]['place'], 'Gorliz, Bizkaia, Euskadi')
 
 
 if __name__ == '__main__':

@@ -206,3 +206,25 @@ def reverse(lat, lon, lang='es', zoom=13, use_cache=True):
     cache[key] = label
     _save_cache(cache)
     return label
+
+
+# Nominatim no adscribe a ningún municipio lo que cae fuera de tierra firme: en mar
+# abierto falla ("Unable to geocode" -> etiqueta vacía) y dentro de aguas territoriales
+# devuelve sólo el país, que es de lo único que la ficha puede tirar. Sobre tierra
+# siempre aparece villa, municipio, comarca o comunidad. Comprobado el 2026-08-05:
+# 44,01/-7,48 (mar, ~37 km al norte de Lugo) -> "Unable to geocode"; 43,93/-7,63 ->
+# "España" a secas; 43,26/-8,99 -> "O Porto de Corme, Ponteceso, Bergantiños".
+# De ahí que sirva de test tierra/mar: no para elegir un punto, sino para NO
+# recomendar uno donde nadie puede ponerse de pie.
+COUNTRY_ONLY = frozenset(
+    ('españa', 'spain', 'francia', 'france', 'portugal', 'andorra'))
+
+
+def on_land(place):
+    """¿El topónimo confirma tierra firme?
+
+    False cuando el reverse no devolvió nada o sólo el país. Es deliberadamente
+    conservador: un punto que no se confirma como tierra no se recomienda, igual que
+    un dato que falta se marca «sin comprobar» y nunca «limpio».
+    """
+    return bool(place) and place.strip().lower() not in COUNTRY_ONLY

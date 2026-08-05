@@ -158,9 +158,49 @@ def build(out_path=None, progress=None, geocode=True, event=None,
             if progress and k % 10 == 0:
                 progress(k, len(points), 'poniendo nombres')
             p['place'] = gazetteer.reverse(p['lat'], p['lon'])
+        points = drop_offshore(points, progress=progress)
 
     meta = _dump(out_path, ev, points)
     return out_path, meta
+
+
+RETRY_ZOOM = 16        # el zoom de la segunda oportunidad, ver drop_offshore
+
+
+def drop_offshore(points, progress=None, retry=True):
+    """Quita los puntos que no se confirman en tierra firme.
+
+    Sobre el mar el DEM vale 0 y el horizonte sale impecable, así que un punto en mar
+    abierto se cuela en lo más alto del ranking por margen libre: exactamente el sitio
+    donde nadie puede plantar un trípode. Va después de poner nombres porque el
+    topónimo es la prueba (ver gazetteer.on_land), y renumera para que `i` siga siendo
+    correlativo.
+
+    Segunda oportunidad antes de tirar nada: al zoom 13 con el que se etiqueta, la costa
+    da falsos positivos — 43,44/-2,94 salía «España» y es Gorliz (Bizkaia), y
+    42,94/-9,29 es el Monte de Arnela en Fisterra, de los mejores márgenes del país.
+    Se reconsulta al zoom 16 y, si aparece municipio, el punto se queda **y de paso
+    arregla su topónimo**. Sólo se descarta lo que sigue sin tierra a ese detalle.
+    """
+    kept, dropped, fixed = [], [], 0
+    for p in points:
+        if gazetteer.on_land(p.get('place')):
+            kept.append(p)
+            continue
+        fine = gazetteer.reverse(p['lat'], p['lon'], zoom=RETRY_ZOOM) if retry else ''
+        if gazetteer.on_land(fine):
+            p['place'] = fine
+            fixed += 1
+            kept.append(p)
+        else:
+            dropped.append(p)
+    for k, p in enumerate(kept, 1):
+        p['i'] = k
+    if progress:
+        progress(len(kept), len(points),
+                 f'descartados {len(dropped)} sin tierra confirmada, '
+                 f'{fixed} topónimos recuperados')
+    return kept
 
 
 def enrich_obstacles(points, progress=None):
