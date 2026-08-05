@@ -8,10 +8,12 @@ still check the parts that depend only on the ephemerides and on maths.
 """
 import os
 import unittest
+import urllib.error
 
 import numpy as np
 
-from eclipseview import events, gazetteer, i18n, recommend, sources, verify
+from eclipseview import (events, gazetteer, i18n, obstacles, recommend,
+                         sources, verify)
 from eclipseview.ephem import _overlap_fraction, circumstances
 from eclipseview.paths import MOSAIC_NPY, FIELD_PKL
 
@@ -272,6 +274,85 @@ class TestStreetViewNeedsARoad(unittest.TestCase):
         p['sv'] = 'https://maps.google.com/…'
         recommend.apply_streetview([p])
         self.assertNotIn('sv', p)
+
+
+class TestOverpassIsPolite(unittest.TestCase):
+    """Overpass es un servicio público y gratuito. El 2026-08-05 nos ganamos un
+    'Connection refused' a nivel TCP tras ~1.150 peticiones en 25 minutos, y lo peor no
+    fue el bloqueo: fue que el código lo tapó y dijo 'OK' al final."""
+
+    def setUp(self):
+        obstacles._healthy = None
+        obstacles._cooldown.clear()
+
+    def tearDown(self):
+        obstacles._healthy = None
+        obstacles._cooldown.clear()
+
+    def test_no_endpoints_means_empty_not_all_of_them(self):
+        # el fallo que lo tapó: devolvía la lista entera cuando no contestaba ninguno
+        obstacles._healthy = []
+        self.assertEqual(obstacles.available_endpoints(), [])
+
+    def test_a_refusal_is_not_treated_as_busy(self):
+        refused = OSError('[Errno 111] Connection refused')
+        unreachable = OSError('[Errno 101] Network is unreachable')
+        self.assertTrue(obstacles._is_refusal(refused))
+        self.assertTrue(obstacles._is_refusal(unreachable))
+        self.assertTrue(obstacles._is_refusal(
+            urllib.error.HTTPError('u', 429, 'slow down', {}, None)))
+        # un 504 es "estoy ocupado", no "vete": ése sí se reintenta
+        self.assertFalse(obstacles._is_refusal(
+            urllib.error.HTTPError('u', 504, 'busy', {}, None)))
+
+    def test_a_refused_endpoint_goes_on_cooldown(self):
+        obstacles._healthy = ['https://a', 'https://b']
+        obstacles._penalise('https://a', obstacles.BAN_COOLDOWN_S)
+        self.assertEqual(obstacles.available_endpoints(), ['https://b'])
+
+    def test_server_retry_after_wins_over_our_guess(self):
+        err = urllib.error.HTTPError('u', 429, 'slow', {'Retry-After': '120'}, None)
+        self.assertEqual(obstacles._retry_after(err, 0), 120.0)
+
+    def test_backoff_grows_and_is_capped(self):
+        e = OSError('timeout')
+        primero = obstacles._retry_after(e, 0)
+        septimo = obstacles._retry_after(e, 7)
+        self.assertGreater(septimo, primero)
+        self.assertLessEqual(septimo, obstacles.MAX_BACKOFF_S)
+
+    def test_a_total_outage_stops_the_run(self):
+        # con todo caído no se devuelven 401 fallos: se para y se dice por qué
+        obstacles._healthy = []
+        with self.assertRaises(obstacles.NoEndpoints):
+            obstacles.check_batch([(42.0, -4.0, 285.0, 900.0)])
+
+    def test_a_failing_batch_is_split_before_giving_up(self):
+        """Un lote de 25 que falla perdía los 25. Ahora se parte: si sólo un punto es
+        problemático, se pierde uno."""
+        malo = (42.5, -4.5, 285.0, 900.0)
+        items = [(42.0 + i / 100.0, -4.0, 285.0, 900.0) for i in range(4)] + [malo]
+        obstacles._healthy = ['https://fake']
+        llamadas = []
+
+        def fake_multi(boxes, timeout=45, tries=3):
+            llamadas.append(len(boxes))
+            if len(boxes) > 1:
+                raise OSError('demasiado grande')      # sólo pasa de uno en uno
+            return {'elements': []}
+
+        real_multi, real_save = obstacles._query_multi, obstacles._save
+        obstacles._query_multi = fake_multi
+        obstacles._save = lambda: None
+        obstacles._cache = {}
+        try:
+            out = obstacles.check_batch(items, batch=len(items))
+        finally:
+            obstacles._query_multi, obstacles._save = real_multi, real_save
+            obstacles._cache = None
+        self.assertTrue(all(r is not None for r in out), 'ningún punto sin resultado')
+        self.assertTrue(all(r.get('ok') for r in out), 'se resolvieron todos al partir')
+        self.assertGreater(max(llamadas), 1, 'lo intentó primero en lote')
 
 
 if __name__ == '__main__':

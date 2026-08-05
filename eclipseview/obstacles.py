@@ -55,16 +55,35 @@ DEFAULT_HEIGHTS = {
 }
 LEVEL_HEIGHT_M = 3.0
 
+# Ritmo de las consultas. Overpass es un servicio público y gratuito, y el 2026-08-05
+# nos ganamos un "Connection refused" a nivel TCP en overpass-api.de después de lanzar
+# ~1.150 peticiones en 25 minutos desde la misma IP. El coste de ir despacio es tiempo
+# nuestro; el de ir deprisa es que nos cierren la puerta y encima no enterarnos.
+MIN_INTERVAL_S = 6.0          # entre peticiones; se sube con OVERPASS_MIN_INTERVAL
+BAN_COOLDOWN_S = 900.0        # a un endpoint que rechaza la conexión no se le insiste
+MAX_BACKOFF_S = 300.0
+
 _last = [0.0]
 _cache = None
 _healthy = None
+_cooldown = {}                # url -> instante en que se le puede volver a hablar
+
+
+def _min_interval():
+    try:
+        return max(0.5, float(os.environ.get('OVERPASS_MIN_INTERVAL', MIN_INTERVAL_S)))
+    except ValueError:
+        return MIN_INTERVAL_S
 
 
 def healthy_endpoints(force=False, timeout=20):
-    """Probe the endpoints once and keep only the ones answering.
+    """Los endpoints que de verdad contestan. Lista vacía si no contesta ninguno.
 
-    Without this, every failure walks the full rotation and burns a socket timeout on
-    each dead host: with two of three down, a single retry cost ~50 s of nothing.
+    Antes, cuando fallaban los tres, devolvía la lista entera «para intentarlo igual».
+    Eso convirtió una caída total en 25 minutos de barra de progreso avanzando y 401
+    puntos fallando en silencio, con el script diciendo «OK» al final. Una comprobación
+    que nunca puede decir «no» no comprueba nada: si no hay a quién preguntar, hay que
+    decirlo y no arrancar.
     """
     global _healthy
     if _healthy is not None and not force:
@@ -82,8 +101,46 @@ def healthy_endpoints(force=False, timeout=20):
             ok.append(url)
         except Exception:
             pass
-    _healthy = ok or list(OVERPASS_ENDPOINTS)   # all down: try anyway, and fail fast
+    _healthy = ok
     return _healthy
+
+
+def available_endpoints():
+    """Sanos y fuera del periodo de castigo."""
+    now = time.time()
+    return [u for u in healthy_endpoints() if _cooldown.get(u, 0.0) <= now]
+
+
+def _penalise(url, seconds):
+    _cooldown[url] = max(_cooldown.get(url, 0.0), time.time() + seconds)
+
+
+def _is_refusal(err):
+    """¿Nos están cerrando la puerta, en vez de estar ocupados?
+
+    Un «Connection refused» o un «Network is unreachable» no mejoran reintentando
+    rápido: o nos han bloqueado o el servicio no está. Insistir sólo empeora la fama
+    de la IP.
+    """
+    if isinstance(err, urllib.error.HTTPError):
+        return err.code in (403, 429)
+    s = str(getattr(err, 'reason', err))
+    return ('refused' in s or 'unreachable' in s or 'Name or service not known' in s)
+
+
+def _retry_after(err, attempt):
+    """Cuánto esperar: lo que diga el servidor, si lo dice; si no, exponencial."""
+    if isinstance(err, urllib.error.HTTPError):
+        try:
+            ra = float(err.headers.get('Retry-After', ''))
+            return min(MAX_BACKOFF_S, max(ra, 1.0))
+        except (TypeError, ValueError):
+            pass
+    # sin jitter, N procesos reintentarían a la vez y volverían a tumbarlo; el tope se
+    # aplica DESPUÉS de dispersar, o el jitter se lo salta por arriba
+    base = _min_interval() * (2 ** attempt)
+    disperso = base * (0.7 + 0.6 * ((time.time() * 1000) % 1000) / 1000.0)
+    return min(MAX_BACKOFF_S, disperso)
 
 
 def _load():
@@ -108,11 +165,48 @@ def _save():
     os.replace(tmp, CACHE_PATH)
 
 
-def _throttle(min_interval=2.5):
+def _throttle(min_interval=None):
+    min_interval = _min_interval() if min_interval is None else min_interval
     dt = time.time() - _last[0]
     if dt < min_interval:
         time.sleep(min_interval - dt)
     _last[0] = time.time()
+
+
+class NoEndpoints(RuntimeError):
+    """No hay ningún Overpass al que preguntar. No es un punto que falla: es que no
+    se puede trabajar, y hay que decirlo en vez de fabricar 401 fallos silenciosos."""
+
+
+def _ask(q, timeout, tries=4):
+    """Una consulta a Overpass, rotando endpoints y esperando de verdad entre intentos.
+
+    Rota por endpoints disponibles, castiga al que rechaza la conexión y respeta el
+    Retry-After del servidor cuando lo manda. Si se queda sin endpoints, levanta
+    NoEndpoints: quien llama debe parar, no seguir dando vueltas.
+    """
+    last = None
+    for attempt in range(tries):
+        eps = available_endpoints()
+        if not eps:
+            raise NoEndpoints(
+                'ningún Overpass disponible' +
+                (f' (último error: {str(last)[:90]})' if last else ''))
+        url = eps[attempt % len(eps)]
+        try:
+            req = urllib.request.Request(
+                url, data=urllib.parse.urlencode({'data': q}).encode(),
+                headers={'User-Agent': UA})
+            _throttle()
+            with urllib.request.urlopen(req, timeout=timeout + 15) as r:
+                return json.load(r)
+        except Exception as e:
+            last = e
+            if _is_refusal(e):
+                _penalise(url, BAN_COOLDOWN_S)
+                continue          # otro endpoint, sin dormir: a éste ya no se le habla
+            time.sleep(_retry_after(e, attempt))
+    raise last
 
 
 def _bbox(lat, lon, az_deg, reach_m=CORRIDOR_M, pad_m=HALF_WIDTH_M):
@@ -221,24 +315,42 @@ def check_batch(items, elev_lookup=None, batch=25, progress=None,
         else:
             todo.append(i)
 
-    for start in range(0, len(todo), batch):
-        chunk = [todo[k] for k in range(start, min(start + batch, len(todo)))]
+    if todo and not available_endpoints():
+        raise NoEndpoints('ningún Overpass responde: no se arranca')
+
+    def resolver(chunk, profundidad=0):
+        """Un lote; si falla, se parte por la mitad antes de darlo por perdido.
+
+        Un lote de 25 que falla perdía los 25 puntos aunque el problema fuese uno solo
+        (una zona densa que hace reventar el timeout). Partiéndolo, lo que se pierde es
+        lo que de verdad no se puede resolver.
+        """
         boxes = [_bbox(*items[i][:3]) for i in chunk]
-        if progress:
-            progress(start + len(chunk), len(todo), 'OSM por lotes')
         try:
             data = _query_multi(boxes, timeout=timeout)
+        except NoEndpoints:
+            raise
         except Exception as e:
+            if len(chunk) > 1 and profundidad < 3:
+                mitad = len(chunk) // 2
+                resolver(chunk[:mitad], profundidad + 1)
+                resolver(chunk[mitad:], profundidad + 1)
+                return
             for i in chunk:
                 out[i] = dict(ok=False, error=str(e)[:120], angle=0.0)
-            continue
+            return
         elements = data.get('elements', [])
         for i in chunk:
             lat, lon, az, elev = items[i]
             res = _evaluate(elements, lat, lon, az, elev, elev_lookup, min_dist_m)
-            key = f'{lat:.4f},{lon:.4f},{az:.0f}'
-            cache[key] = res
+            cache[f'{lat:.4f},{lon:.4f},{az:.0f}'] = res
             out[i] = res
+
+    for start in range(0, len(todo), batch):
+        chunk = [todo[k] for k in range(start, min(start + batch, len(todo)))]
+        if progress:
+            progress(start + len(chunk), len(todo), 'OSM por lotes')
+        resolver(chunk)
         _save()
     return out
 
@@ -251,23 +363,7 @@ def _query_multi(boxes, timeout=45, tries=3):
         parts.append(f'way["natural"~"^(wood|scrub)$"]({s},{w},{n},{e});')
         parts.append(f'way["landuse"~"^(forest|orchard|vineyard)$"]({s},{w},{n},{e});')
     q = f'[out:json][timeout:{timeout}];(' + ''.join(parts) + ');out tags center;'
-    eps = healthy_endpoints()
-    last = None
-    for attempt in range(tries):
-        url = eps[attempt % len(eps)]
-        try:
-            req = urllib.request.Request(
-                url, data=urllib.parse.urlencode({'data': q}).encode(),
-                headers={'User-Agent': UA})
-            _throttle()
-            # Short socket timeout on purpose: a refusing endpoint must fail fast so
-            # the next one gets tried, instead of stalling the whole run.
-            with urllib.request.urlopen(req, timeout=timeout + 15) as r:
-                return json.load(r)
-        except Exception as e:
-            last = e
-            time.sleep(2.0 * (attempt + 1))
-    raise last
+    return _ask(q, timeout, tries=tries)
 
 
 def _evaluate(elements, lat, lon, az_deg, obs_elev, elev_lookup, min_dist_m):
@@ -474,21 +570,7 @@ def check_roads_batch(items, batch=15, progress=None, timeout=60):
 
 
 def _query_raw(q, timeout=45, tries=3):
-    eps = healthy_endpoints()
-    last = None
-    for attempt in range(tries):
-        url = eps[attempt % len(eps)]
-        try:
-            req = urllib.request.Request(
-                url, data=urllib.parse.urlencode({'data': q}).encode(),
-                headers={'User-Agent': UA})
-            _throttle()
-            with urllib.request.urlopen(req, timeout=timeout + 15) as r:
-                return json.load(r)
-        except Exception as e:
-            last = e
-            time.sleep(2.0 * (attempt + 1))
-    raise last
+    return _ask(q, timeout, tries=tries)
 
 
 def streetview_url(lat, lon, heading_deg, pitch=0):
