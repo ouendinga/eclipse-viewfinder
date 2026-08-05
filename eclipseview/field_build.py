@@ -15,7 +15,10 @@ CACHE = FIELD_PKL
 
 
 def row(la):
-    from eclipse import circumstances          # imported inside the worker
+    # Se importa DENTRO del worker por lo del mmap (ver el docstring de arriba). El
+    # módulo se llama eclipseview.ephem; ponía `from eclipse import ...`, que es un
+    # nombre que no existe: `eclipseview setup` reventaba en el primer worker.
+    from .ephem import circumstances
     out = []
     for lo in LONS:
         c = circumstances(float(la), float(lo), 0.0, coarse_step_s=60.0)
