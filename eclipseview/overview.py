@@ -329,8 +329,8 @@ def render(data, finder_html='', finder_css='', finder_js=''):
         {sources.cite('de421')}</td><td>dominio público</td></tr>
     <tr><td>Relieve y perfil del horizonte</td><td>SRTM 1&Prime; (~30 m) vía
         {sources.cite('srtm')}</td><td>dominio público</td></tr>
-    <tr><td>Árboles, edificios y vías de acceso</td><td>{sources.cite('osm')}</td><td>ODbL</td></tr>
-    <tr><td>Topónimos</td><td>Nominatim / OpenStreetMap</td><td>ODbL</td></tr>
+    <tr><td>Árboles, edificios y vías de acceso</td><td>{sources.cite('overpass')}</td><td>ODbL</td></tr>
+    <tr><td>Topónimos</td><td>{sources.cite('osm')}</td><td>ODbL</td></tr>
     <tr><td>Nubosidad de agosto</td><td>{sources.cite('eclipsophile')}</td><td>citada, no
         redistribuida</td></tr>
     <tr><td>Contraste de los cálculos</td><td>{sources.cite('ign')} y {sources.cite('nasa_gsfc')}</td><td>citadas</td></tr>
@@ -379,20 +379,6 @@ def render(data, finder_html='', finder_css='', finder_js=''):
     sitio, así que verás con tus ojos lo que ningún modelo puede confirmarte — el pino,
     la nave, el poste y si se llega.</p>
   </div>
-</section>
-
-<section>
-  <h2>Límites conocidos</h2>
-  <div class="note warn">
-    El modelo de elevación no ve <b>árboles, edificios ni naves</b>: por eso pido
-    margen y no 0°. Las duraciones llevan un sesgo sistemático de <b>+2–3 %</b>
-    frente al IGN por el convenio de radio lunar, así que tómalas como ±3 s; para
-    horarios oficiales, el {sources.cite('ign')}. La refracción cerca del horizonte
-    varía con la temperatura y puede mover el terreno lejano una o dos décimas de
-    grado. Los porcentajes de nubosidad son climatología, <b>no un pronóstico</b>.
-    Y las coordenadas son puntos del terreno, no de acceso: comprueba que se llega y
-    que no estás en finca privada.
-  </div>
 </section>'''
 
     return f'''<!doctype html>
@@ -411,4 +397,9 @@ topónimos {sources.cite('osm')} · contraste con {sources.cite('ign')} y
 Hecho por <a href="https://alvarosolis.dev">Álvaro Solís</a>.</p></footer>
 </div>
 {finder_js}
+<!-- Vercel Web Analytics: sin cookies y sin datos personales, así que no hace falta
+     banner de consentimiento. Se sirve desde el propio dominio, no desde un tercero.
+     Requiere tenerlo activado en el panel del proyecto (ver docs/pending-human.md);
+     si no lo está, el script da 404 y la página sigue funcionando igual. -->
+<script defer src="/_vercel/insights/script.js"></script>
 </body></html>'''

@@ -50,6 +50,12 @@ CITATIONS = {
         'label': 'Nominatim / OpenStreetMap',
         'url': 'https://nominatim.openstreetmap.org/',
     },
+    # Árboles, edificios y vías NO salen de Nominatim (geocodificador): salen de
+    # Overpass, que consulta la base de datos de OSM. Citar la fuente correcta.
+    'overpass': {
+        'label': 'Overpass API / OpenStreetMap',
+        'url': 'https://overpass-api.de/',
+    },
 }
 
 # --------------------------------------------------------------- verification

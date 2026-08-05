@@ -4,12 +4,16 @@ Actualizado: 2026-08-05
 
 ## Decisiones pendientes
 
-- [ ] **Analítica.** Recomendación: instalar **Vercel Web Analytics** (ya aprovisionada
-      en el proyecto, una línea, sin cookies, sin banner, 50.000 eventos/mes).
-      Ahora mismo **no se registra ninguna visita** — las que ha traído WhatsApp se han
-      perdido y no son recuperables.
-      Descartadas: Google Analytics (cookies + banner + dudas legales por transferencias)
-      y Cloudflare Web Analytics (su única ventaja es un límite que no se va a rozar).
+- [x] **Analítica: decidida y puesta.** Vercel Web Analytics (sin cookies, sin banner,
+      50.000 eventos/mes). El `<script defer src="/_vercel/insights/script.js">` ya va en
+      la página (`overview.py`). Descartadas: Google Analytics (cookies + banner + dudas
+      legales por transferencias) y Cloudflare Web Analytics (su única ventaja es un
+      límite que no se va a rozar).
+
+- [ ] **Activar Web Analytics en el panel de Vercel** — esto no lo puede hacer el código.
+      Proyecto `eclipse-viewfinder` → pestaña **Analytics** → **Enable**. Hasta que se
+      pulse, el script devuelve 404 (la página funciona igual) y **no se registra ninguna
+      visita**. Las que trajo WhatsApp ya se perdieron y no son recuperables.
 
 - [ ] **¿Registrar las localidades buscadas?** Requiere Vercel Pro (20 $/mes) o el truco
       de leer la query string (`?n=Malgrat+de+Mar`), que está **sin verificar**. Además
