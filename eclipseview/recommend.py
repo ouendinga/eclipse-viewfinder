@@ -249,13 +249,42 @@ def apply_streetview(points):
     """
     n = 0
     for p in points:
-        pv = (p.get('acc') or {}).get('paved') if p.get('acc_ok') else None
-        if pv and pv.get('m') is not None and pv['m'] <= obstacles.SV_MAX_ROAD_M:
+        if _sv_allowed(p):
             p['sv'] = obstacles.streetview_url(p['lat'], p['lon'], p['az'])
             n += 1
         else:
             p.pop('sv', None)
     return n
+
+
+def check_invariants(points):
+    """Lo que un dataset publicable tiene que cumplir SIEMPRE. Devuelve la lista de
+    incumplimientos, vacía si está sano.
+
+    Existe porque el 2026-08-05 el fichero local apareció con 1.469 puntos, los 26 del
+    mar de vuelta y 50 enlaces de Street View, sin que ningún proceso conocido lo
+    escribiera. No se pudo averiguar la causa; lo que sí se puede es impedir que un
+    dataset así se publique. Un guardia sirve precisamente para lo que no viste venir.
+    """
+    from . import gazetteer
+    fallos = []
+    mar = [p for p in points if not gazetteer.on_land(p.get('place'))]
+    if mar:
+        fallos.append(f'{len(mar)} puntos sin tierra confirmada (p. ej. '
+                      f'{mar[0]["lat"]:.3f},{mar[0]["lon"]:.3f})')
+    malos_sv = [p for p in points if p.get('sv') and not _sv_allowed(p)]
+    if malos_sv:
+        fallos.append(f'{len(malos_sv)} enlaces de Street View sin carretera cerca')
+    idx = [p.get('i') for p in points]
+    if idx != list(range(1, len(points) + 1)):
+        fallos.append(f'los índices no son correlativos (1..{len(points)}): '
+                      f'van de {idx[0]} a {idx[-1]}')
+    return fallos
+
+
+def _sv_allowed(p):
+    pv = (p.get('acc') or {}).get('paved') if p.get('acc_ok') else None
+    return bool(pv and pv.get('m') is not None and pv['m'] <= obstacles.SV_MAX_ROAD_M)
 
 
 def _dump(out_path, ev, points, extra=None):

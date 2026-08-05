@@ -191,6 +191,15 @@ def build(out_dir=None, lang='es', preset=None, progress=None, with_overview=Tru
 
     src = os.path.join(DATA_DIR, 'points.json')
     if os.path.exists(src):
+        # Último control antes de publicar. Un dataset se toca desde varios sitios
+        # (access, enrich, podas) y basta que uno se salte una regla para publicar
+        # puntos en el mar o enlaces a una pantalla negra. Ya pasó.
+        from . import recommend
+        with open(src) as f:
+            fallos = recommend.check_invariants(json.load(f)['points'])
+        if fallos:
+            raise ValueError('El dataset no está publicable:\n  - ' +
+                             '\n  - '.join(fallos))
         shutil.copyfile(src, os.path.join(out_dir, 'points.json'))
     else:
         raise FileNotFoundError(
