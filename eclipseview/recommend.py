@@ -217,7 +217,10 @@ def enrich_obstacles(points, progress=None):
     res = obstacles.check_batch(items, elev_lookup=lookup, progress=progress)
     n_ok = 0
     for p, o in zip(points, res):
-        p['sv'] = obstacles.streetview_url(p['lat'], p['lon'], p['az'])
+        # OJO: aquí NO se toca 'sv'. Quien decide si hay foto de Street View es
+        # apply_streetview(), que necesita saber si hay carretera cerca — un dato que
+        # esta función no tiene. Ponerlo aquí se lo daba a los 1.457 puntos y deshacía
+        # la regla en silencio cada vez que se reintentaban los árboles.
         if not o or not o.get('ok'):
             p['obs_ok'] = False
             p.setdefault('obs', 0.0)
@@ -232,6 +235,27 @@ def enrich_obstacles(points, progress=None):
             p['obs_h'] = w['height_m']; p['obs_meas'] = w['measured']
         p['clear_net'] = round(min(p['clear'], p['alt'] - max(p['hz'], p['obs'])), 2)
     return n_ok
+
+
+def apply_streetview(points):
+    """Decide el enlace de Street View de cada punto, en un único sitio.
+
+    Street View se graba desde la vía: sin carretera asfaltada muy cerca, el enlace
+    abre una pantalla negra (pasó en producción). La regla vive aquí y no repartida
+    por los scripts, porque cuando estaba repartida `enrich_obstacles` volvió a
+    ponérselo a los 1.457 puntos sin que nadie se enterase.
+
+    Sin perfil de acceso comprobado no hay enlace: un dato que falta no se disfraza.
+    """
+    n = 0
+    for p in points:
+        pv = (p.get('acc') or {}).get('paved') if p.get('acc_ok') else None
+        if pv and pv.get('m') is not None and pv['m'] <= obstacles.SV_MAX_ROAD_M:
+            p['sv'] = obstacles.streetview_url(p['lat'], p['lon'], p['az'])
+            n += 1
+        else:
+            p.pop('sv', None)
+    return n
 
 
 def _dump(out_path, ev, points, extra=None):

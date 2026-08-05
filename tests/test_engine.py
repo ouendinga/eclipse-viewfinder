@@ -247,5 +247,32 @@ class TestOffshoreIsNotRecommended(unittest.TestCase):
         self.assertEqual(kept[0]['place'], 'Gorliz, Bizkaia, Euskadi')
 
 
+class TestStreetViewNeedsARoad(unittest.TestCase):
+    """Street View se graba desde la vía: sin asfalto cerca el enlace abre una pantalla
+    negra. Ya pasó en producción una vez, y volvió a pasar cuando enrich_obstacles
+    reasignaba 'sv' a todos los puntos."""
+
+    def _p(self, **acc):
+        return dict(lat=42.5, lon=-4.3, az=285.0, **acc)
+
+    def test_link_only_with_asphalt_close_enough(self):
+        cerca = self._p(acc_ok=True, acc={'paved': {'m': 40}})
+        lejos = self._p(acc_ok=True, acc={'paved': {'m': 800}})
+        sin_via = self._p(acc_ok=True, acc={'paved': None})
+        sin_comprobar = self._p(acc_ok=False)
+        pts = [cerca, lejos, sin_via, sin_comprobar]
+        self.assertEqual(recommend.apply_streetview(pts), 1)
+        self.assertTrue(cerca.get('sv'))
+        for p in (lejos, sin_via, sin_comprobar):
+            self.assertIsNone(p.get('sv'))
+
+    def test_a_stale_link_is_removed(self):
+        # lo que hacía enrich: dejar el enlace puesto de una pasada anterior
+        p = self._p(acc_ok=True, acc={'paved': {'m': 800}})
+        p['sv'] = 'https://maps.google.com/…'
+        recommend.apply_streetview([p])
+        self.assertNotIn('sv', p)
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

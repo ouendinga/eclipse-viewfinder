@@ -22,13 +22,11 @@ for p, r in zip(P, res):
     n += 1
     p['acc_ok'] = True
     p['acc'] = {k: v for k, v in r.items() if k in ('near','drive','walk','paved')}
-    pv = r.get('paved'); dr = r.get('drive')
-    # Street View sólo si hay vía rodada pública muy cerca: se graba desde la carretera
-    if pv and pv['m'] is not None and pv['m'] <= obstacles.SV_MAX_ROAD_M:
-        p['sv'] = obstacles.streetview_url(p['lat'], p['lon'], p['az'])
-    else:
-        p.pop('sv', None)
+    dr = r.get('drive')
     p['acc_hard'] = bool(dr and dr.get('hard'))
+# la regla de Street View vive en un único sitio, no repartida por los scripts
+n_sv = recommend.apply_streetview(P)
 meta = recommend._dump(path, events.DEFAULT, P, extra=dict(n_access_checked=n))
+print(f'Street View en {n_sv} puntos (sólo con asfalto a <={obstacles.SV_MAX_ROAD_M:.0f} m)')
 print(f'OK accesibilidad: {n}/{len(P)} comprobados')
 PY
