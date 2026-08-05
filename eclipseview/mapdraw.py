@@ -32,7 +32,7 @@ def png_bytes(rgb):
 
 
 def terrain_raster():
-    from horizon import dem, PER_DEG, LAT_N, LON_W
+    from .terrain import dem, PER_DEG, LAT_N, LON_W
     d = dem()
     r0 = int((LAT_N - LA_N) * PER_DEG); r1 = int((LAT_N - LA_S) * PER_DEG)
     c0 = int((LO_W - LON_W) * PER_DEG); c1 = int((LO_E - LON_W) * PER_DEG)
@@ -51,6 +51,34 @@ def terrain_raster():
     rgb[..., 2] = (60 + t * 120).astype(np.uint8)
     rgb[sea] = np.array([22, 30, 38], dtype=np.uint8)
     return rgb
+
+
+def contour_segments(grid, lats, lons, level):
+    """Marching squares: segments where `grid` crosses `level`, in (lon, lat).
+
+    Written out rather than pulled from a plotting library because the map is hand
+    drawn as SVG and the whole project ships with only numpy.
+    """
+    segs = []
+    for i in range(len(lats) - 1):
+        for j in range(len(lons) - 1):
+            # corners, counter-clockwise from bottom-left
+            v = [grid[i, j], grid[i, j + 1], grid[i + 1, j + 1], grid[i + 1, j]]
+            if min(v) > level or max(v) < level:
+                continue
+            corners = [(lons[j], lats[i]), (lons[j + 1], lats[i]),
+                       (lons[j + 1], lats[i + 1]), (lons[j], lats[i + 1])]
+            pts = []
+            for k in range(4):
+                a, b = v[k], v[(k + 1) % 4]
+                if (a < level) == (b < level) or a == b:
+                    continue
+                t = (level - a) / (b - a)
+                (x0, y0), (x1, y1) = corners[k], corners[(k + 1) % 4]
+                pts.append((x0 + t * (x1 - x0), y0 + t * (y1 - y0)))
+            for k in range(0, len(pts) - 1, 2):
+                segs.append((pts[k], pts[k + 1]))
+    return segs
 
 
 def main():
@@ -87,7 +115,13 @@ def main():
     def path(pts):
         return ' '.join(f'{X(lo):.1f},{Y(la):.1f}' for lo, la in pts)
 
-    sites = json.load(open(SITES_JSON))
+    # Every recommended viewpoint, coloured by the margin that survives trees and
+    # buildings. The map and the search now show the same dataset.
+    pts_path = os.path.join(DATA_DIR, 'points.json')
+    sites = []
+    if os.path.exists(pts_path):
+        with open(pts_path) as fh:
+            sites = json.load(fh)['points']
 
     png = base64.b64encode(png_bytes(terrain_raster())).decode()
     o = [f'<svg viewBox="0 0 {W} {H}" xmlns="http://www.w3.org/2000/svg" class="map" '
@@ -102,16 +136,57 @@ def main():
     o.append(f'<polyline points="{path(centre)}" fill="none" stroke="#ff9b3d" '
              f'stroke-width="1.6" stroke-dasharray="7 4"/>')
     for s in sites:
-        if s['key'] == 'penisc':
-            col, r = '#ff5c5c', 4.5
-        elif s.get('clearance', 0) >= 5:
-            col, r = '#8ce99a', 5
+        net = s.get('clear_net', s.get('clear', 0))
+        if net < 1.5:
+            col, r = '#ff5c5c', 2.0
+        elif net >= 5:
+            col, r = '#8ce99a', 2.6
         else:
-            col, r = '#ffe066', 4.5
+            col, r = '#ffe066', 2.3
         x, y = float(X(s['lon'])), float(Y(s['lat']))
         o.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r}" fill="{col}" '
-                 f'stroke="#0e1116" stroke-width="1.4"/>')
+                 f'fill-opacity="0.9" stroke="#0e1116" stroke-width="0.7"/>')
     # a few reference cities for orientation
+    # --- Sun altitude at maximum, as contours -------------------------------
+    # Xavier Jubier's map draws the line where maximum eclipse coincides with sunset.
+    # For this project the useful generalisation is the whole family: how high the Sun
+    # actually is, which is what decides whether the terrain swallows it.
+    las_f, lons_f = f['lats'], f['lons']
+    mag = f['mag']
+    inside = mag >= 0.90
+    alt = np.where(inside, f['a_mx'], np.nan)
+    for lvl in (2, 4, 6, 8, 10, 12):
+        segs = contour_segments(np.nan_to_num(alt, nan=-99.0), las_f, lons_f, lvl)
+        if not segs:
+            continue
+        d = ' '.join(f'M{X(a[0]):.1f},{Y(a[1]):.1f} L{X(b[0]):.1f},{Y(b[1]):.1f}'
+                     for a, b in segs)
+        o.append(f'<path d="{d}" fill="none" stroke="#7fd4ff" stroke-opacity="0.5" '
+                 f'stroke-width="0.9" stroke-dasharray="2 3"/>')
+        # label on the segment closest to the middle of the drawn map
+        mid = min(segs, key=lambda sg: abs(sg[0][0] - (LO_W + LO_E) / 2))
+        o.append(f'<text x="{X(mid[0][0]):.1f}" y="{Y(mid[0][1]):.1f}" '
+                 f'fill="#7fd4ff" fill-opacity="0.85" font-size="9" '
+                 f'text-anchor="middle">{lvl}&#176;</text>')
+
+    # --- Time of maximum, every 10 minutes ----------------------------------
+    tmx = np.where(inside, f['t_mx'] / 60.0, np.nan)      # minutes UTC
+    t0 = np.nanmin(tmx); t1 = np.nanmax(tmx)
+    start = int(np.ceil(t0 / 10.0) * 10)
+    for m in range(start, int(t1) + 1, 10):
+        segs = contour_segments(np.nan_to_num(tmx, nan=-999.0), las_f, lons_f, m)
+        if not segs:
+            continue
+        d = ' '.join(f'M{X(a[0]):.1f},{Y(a[1]):.1f} L{X(b[0]):.1f},{Y(b[1]):.1f}'
+                     for a, b in segs)
+        o.append(f'<path d="{d}" fill="none" stroke="#ffb37a" stroke-opacity="0.38" '
+                 f'stroke-width="0.8"/>')
+        lo_lab = min(segs, key=lambda sg: abs(sg[0][1] - 43.6))
+        hh = int((m + 120) // 60) % 24
+        o.append(f'<text x="{X(lo_lab[0][0]):.1f}" y="{Y(lo_lab[0][1]) - 3:.1f}" '
+                 f'fill="#ffb37a" fill-opacity="0.75" font-size="8" '
+                 f'text-anchor="middle">{hh:02d}:{int(m % 60):02d}</text>')
+
     for nm, la, lo in [('Barcelona', 41.39, 2.17), ('Madrid', 40.42, -3.70),
                        ('Zaragoza', 41.65, -0.89), ('Oviedo', 43.36, -5.85),
                        ('Valencia', 39.47, -0.38), ('Palma', 39.57, 2.65),

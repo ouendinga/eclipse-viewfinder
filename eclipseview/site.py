@@ -13,7 +13,7 @@ import json
 import os
 import unicodedata
 
-from . import gazetteer, i18n, overview, report, verify
+from . import finder_ui, gazetteer, i18n, overview, report, verify
 from .analysis import evaluate, km, search_area
 from .paths import REPORTS_DIR, ensure
 from .style import CSS
@@ -169,60 +169,36 @@ Hecho por <a href="https://alvarosolis.dev">Álvaro Solís</a>.</p></footer>
 
 
 def build(out_dir=None, lang='es', preset=None, progress=None, with_overview=True):
+    """Build the site: one page with everything, plus the points dataset it searches.
+
+    The 16 static per-town pages are gone: with the precomputed points shipped as data,
+    any town is answered client-side, so keeping frozen copies of a few of them would
+    only mean two places to keep in sync.
+    """
+    import shutil
+    from .paths import DATA_DIR
     out_dir = out_dir or os.path.join(REPORTS_DIR, 'site')
     os.makedirs(out_dir, exist_ok=True)
     ensure()
-    summary = verify.summarise(verify.run_all(include_width=False))
-    entries = []
-    for query, radius in (preset or PRESET):
-        origin, label, full, rows = build_one(query, radius, lang=lang,
-                                              progress=progress)
-        html = report.render_place(dict(label=label, full=full,
-                                        lat=origin['lat'], lon=origin['lon']),
-                                   radius, rows, 1.5, lang=lang,
-                                   verification=summary)
-        s = slug(origin['name'])
-        _write(os.path.join(out_dir, f'{s}.html'), _page(html, label))
-        best = max(rows, key=lambda r: r['clear'])
-        home = next(r for r in rows if r.get('is_origin'))
-        totals = [r for r in rows if r['total'] and not r.get('is_origin')]
-        # What the ORIGIN gets is not what its region offers. Labelling Madrid or
-        # Barcelona "totalidad" because a viewpoint 60 km away has it would mislead
-        # exactly where it hurts most.
-        entries.append(dict(slug=s, label=label, best=best,
-                            origin_total=home['total'], origin_obsc=home['obsc'],
-                            origin_dur=home['dur'],
-                            n_total=len(totals),
-                            nearest_total_km=(min(r['dist'] for r in totals)
-                                              if totals else None)))
-    if with_overview:
-        if progress:
-            progress('informe general de España')
-        data = overview.build()
-        _write(os.path.join(out_dir, 'overview.html'),
-               _page(overview.render(data), 'Informe general'))
-    _write(os.path.join(out_dir, 'index.html'), render_index(entries, lang))
-    json.dump([{k: v for k, v in e.items() if k != 'best'} |
-               {'best_clear': e['best']['clear'],
-                'best_place': e['best'].get('place')} for e in entries],
-              open(os.path.join(out_dir, 'places.json'), 'w'),
-              ensure_ascii=False, indent=1)
-    return out_dir, entries
+    if progress:
+        progress('calculando el informe general')
+    data = overview.build()
+    html = overview.render(data,
+                           finder_html=finder_ui.html(),
+                           finder_css=finder_ui.CSS,
+                           finder_js=finder_ui.script())
+    _write(os.path.join(out_dir, 'index.html'), html)
 
-
-def _page(fragment, title):
-    """Reports are rendered as fragments; wrap them into standalone documents."""
-    return ('<!doctype html>\n<html lang="es"><head><meta charset="utf-8">'
-            '<meta name="viewport" content="width=device-width,initial-scale=1">'
-            '<link rel="icon" href="data:image/svg+xml,'
-            '%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E'
-            '%3Ccircle cx=%2216%22 cy=%2216%22 r=%2213%22 fill=%22%23e08a2e%22/%3E'
-            '%3Ccircle cx=%2221%22 cy=%2213%22 r=%2213%22 fill=%22%230e131a%22/%3E'
-            '%3C/svg%3E">'
-            f'</head><body>{fragment}'
-            '<div class="wrap"><footer><p><a href="./index.html">← todos los sitios</a>'
-            ' · <a href="https://github.com/ouendinga/eclipse-viewfinder">código</a>'
-            '</p></footer></div></body></html>')
+    src = os.path.join(DATA_DIR, 'points.json')
+    if os.path.exists(src):
+        shutil.copyfile(src, os.path.join(out_dir, 'points.json'))
+    else:
+        raise FileNotFoundError(
+            'Falta data/points.json. Genera los puntos recomendados primero:\n'
+            '  python -c "from eclipseview import recommend; recommend.build()"')
+    _write(os.path.join(out_dir, 'robots.txt'),
+           'User-agent: *\nAllow: /\n')
+    return out_dir, data
 
 
 def _write(path, text):

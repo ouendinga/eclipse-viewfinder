@@ -25,6 +25,10 @@ from .analysis import evaluate, km
 from .ephem import circumstances, sun_track
 from .panorama import AZ_LO, AZ_HI
 from .paths import DATA_DIR, SCAN_PKL
+
+# Prefer the magnitude-selected sweep: it reaches the deep-partial ground outside the
+# path, so a town 100 km north of the shadow gets viewpoints instead of an empty list.
+WIDE_PKL = os.path.join(DATA_DIR, 'scan_wide.pkl')
 from .terrain import elev_fine, horizon_fine
 
 # Horizon sampled across the plotted window; 0.25 deg is finer than the Sun's diameter.
@@ -32,42 +36,55 @@ AZ_STEP = 0.25
 AZIMUTHS = np.arange(AZ_LO, AZ_HI + 1e-9, AZ_STEP)
 
 MIN_CLEAR = 2.0        # a recommendation must have real margin, not just be positive
-SEP_KM = 11.0          # spatial spacing between recommendations
+SEP_KM = 14.0          # spacing inside the path; ~1100 cells over the band
 MAX_POINTS = 700
 
 
-def select(scan_path=SCAN_PKL, min_clear=MIN_CLEAR, sep_km=SEP_KM,
-           max_points=MAX_POINTS, progress=None):
-    """Pick well-spread viewpoints from the band-wide scan, best first."""
+def select(scan_path=None, min_clear=MIN_CLEAR, sep_km=SEP_KM,
+           sep_km_partial=25.0, max_points=2000, progress=None):
+    """Pick the BEST viewpoint in each cell, rather than the globally top-scoring ones.
+
+    Ranking globally looks sensible and is wrong: totality outscores everything, so the
+    whole quota lands inside the path and a town 100 km outside it gets an empty
+    result. Coverage is the requirement here, so the map is divided into cells and each
+    cell contributes its own best spot.
+
+    Cells are finer inside the path (where people will actually travel) and coarser
+    outside it, which keeps the dataset small without leaving holes.
+    """
+    scan_path = scan_path or (WIDE_PKL if os.path.exists(WIDE_PKL) else SCAN_PKL)
     with open(scan_path, 'rb') as f:
         d = pickle.load(f)
     lat, lon, clear, dur = d['lat'], d['lon'], d['clear'], d['dur']
-    elev, alt = d['elev'], d['a_c3']
+    alt = d['a_c3']
 
     ok = clear >= min_clear
     idx = np.where(ok)[0]
-    # Rank by what actually makes a viewpoint good: margin, then seconds of corona,
-    # then how high the Sun is (transparency).
-    score = np.minimum(clear[idx], 8.0) + dur[idx] / 20.0 + np.minimum(alt[idx], 12) * 0.5
-    order = idx[np.argsort(-score)]
+    score = (np.minimum(clear[idx], 8.0) + dur[idx] / 20.0
+             + np.minimum(alt[idx], 12) * 0.5)
 
-    # Greedy spacing on a grid, which is O(n) instead of O(n^2) against every pick.
-    cell = sep_km / 111.2
-    taken = set()
-    picks = []
-    for i in order:
-        key = (int(lat[i] / cell), int(lon[i] / (cell / np.cos(np.radians(lat[i])))))
-        if key in taken:
-            continue
-        if any((key[0] + a, key[1] + b) in taken
-               for a in (-1, 0, 1) for b in (-1, 0, 1)):
-            continue
-        taken.add(key)
-        picks.append(int(i))
-        if len(picks) >= max_points:
-            break
-        if progress and len(picks) % 50 == 0:
-            progress(len(picks), max_points, 'seleccionando')
+    best = {}
+    for pos, i in enumerate(idx):
+        total = dur[i] >= 1.0
+        cell_km = sep_km if total else sep_km_partial
+        c = cell_km / 111.2
+        key = (bool(total), int(lat[i] / c),
+               int(lon[i] / (c / np.cos(np.radians(lat[i])))))
+        cur = best.get(key)
+        if cur is None or score[pos] > cur[0]:
+            best[key] = (score[pos], int(i))
+
+    # Cap each category separately. A single global cap sorted by score is the bug
+    # this function exists to avoid: totality always wins it, and the partial cells --
+    # the ones a city outside the path depends on -- get truncated away.
+    tot = sorted(((k, v) for k, v in best.items() if k[0]), key=lambda t: -t[1][0])
+    par = sorted(((k, v) for k, v in best.items() if not k[0]), key=lambda t: -t[1][0])
+    # No global cap: every cell that exists is a place someone might be standing.
+    n_tot = min(len(tot), max_points)
+    n_par = min(len(par), max_points)
+    picks = [v[1] for _, v in tot[:n_tot]] + [v[1] for _, v in par[:n_par]]
+    if progress:
+        progress(len(picks), len(picks), f'seleccionando ({n_tot} totalidad, {n_par} parciales)')
     return d, picks
 
 

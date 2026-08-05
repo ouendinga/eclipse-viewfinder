@@ -199,7 +199,7 @@ def _verification(checks, summary):
 </section>'''
 
 
-def render(data):
+def render(data, finder_html='', finder_css='', finder_js=''):
     s = data['sites']
     scan = data['scan']
     lim = data['limits']
@@ -243,6 +243,8 @@ def render(data):
   He calculado la geometría del eclipse y el perfil real del terreno en esa dirección
   para <b>{scanned} puntos</b> de la franja.</p>
 </header>
+
+{finder_html}
 
 <section>
   <h2>Lo esencial</h2>
@@ -328,10 +330,20 @@ def render(data):
   </div>
 </section>'''
 
-    return f'''<title>Eclipse del 12 de agosto de 2026: dónde ponerse</title>
-<style>{CSS}</style>
+    return f'''<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Eclipse Viewfinder — desde dónde ver el eclipse del 12 de agosto de 2026</title>
+<meta name="description" content="Desde dónde ver el eclipse total del 12 de agosto de 2026 en España teniendo en cuenta el terreno real, los árboles y los edificios. El Sol estará entre 2° y 12°: una loma cercana lo tapa.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%2213%22 fill=%22%23e08a2e%22/%3E%3Ccircle cx=%2221%22 cy=%2213%22 r=%2213%22 fill=%22%230e131a%22/%3E%3C/svg%3E">
+<style>{CSS}
+{finder_css}</style></head><body>
 <div class="wrap">{body}
 <footer><p>Efemérides {sources.cite('de421')} · relieve {sources.cite('srtm')} ·
 topónimos {sources.cite('osm')} · contraste con {sources.cite('ign')} y
-{sources.cite('nasa_gsfc')}. Hora peninsular = UTC+2.</p></footer>
-</div>'''
+{sources.cite('nasa_gsfc')}. Hora peninsular = UTC+2.
+<a href="https://github.com/ouendinga/eclipse-viewfinder">Código y metodología</a>.
+Hecho por <a href="https://alvarosolis.dev">Álvaro Solís</a>.</p></footer>
+</div>
+{finder_js}
+</body></html>'''
