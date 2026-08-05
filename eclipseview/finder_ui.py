@@ -38,21 +38,39 @@ CSS = """
 .sugg .s2{display:block;font:11px var(--mono);color:var(--dim);margin-top:2px}
 .fstatus{padding:0 20px 16px;font-size:13.5px;color:var(--muted)}
 .fstatus b{color:var(--sun)}
-.fres{border-top:1px solid var(--line-soft)}
-.fres .site{border:0;border-top:1px solid var(--line-soft);margin:0}
+.fres{border-top:1px solid var(--line-soft);background:var(--ground);
+  padding:16px;display:flex;flex-direction:column;gap:16px}
+/* Cada resultado es una tarjeta con su propio borde: pegadas unas a otras no se ve
+   dónde acaba un mirador y empieza el siguiente. */
+.fres .site{border:1px solid var(--line);background:var(--panel);margin:0}
+.fres .site:hover{border-color:var(--dim)}
 .fempty{padding:16px 20px;border-top:1px solid var(--line-soft);font-size:14.5px}
 .chip{display:inline-block;font:600 11px var(--mono);padding:2px 8px;
   border:1px solid currentColor;margin-left:8px}
 .chip.g{color:var(--good)} .chip.w{color:var(--warn)} .chip.b{color:var(--bad)}
+.badges{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+  justify-content:flex-end}
+.badges .badge{margin-left:0}
+.risk{position:relative;font:700 10px var(--mono);letter-spacing:.06em;
+  color:var(--bad);border:1px solid currentColor;padding:3px 8px;cursor:help;
+  white-space:nowrap}
+.risk:focus{outline:2px solid var(--sun);outline-offset:2px}
+.risk .tip{position:absolute;right:0;top:calc(100% + 8px);width:min(340px,78vw);
+  background:var(--ground);color:var(--text);border:1px solid var(--bad);
+  padding:11px 13px;font:400 12.5px/1.55 var(--sans);letter-spacing:0;
+  white-space:normal;text-transform:none;z-index:30;
+  opacity:0;visibility:hidden;transition:opacity .12s}
+.risk:hover .tip,.risk:focus .tip{opacity:1;visibility:visible}
+@media (prefers-reduced-motion:reduce){.risk .tip{transition:none}}
 .ptcoord{font-family:var(--mono)!important;font-size:16px!important;letter-spacing:.01em}
-.ptlinks{display:flex;flex-wrap:wrap;gap:14px;margin:12px 0 0;
-  font:600 12px var(--mono)}
+.ptlinks{display:flex;flex-wrap:wrap;gap:10px 16px;margin:14px 0 0;
+  font:600 12px var(--mono);align-items:center}
 .ptlinks a{color:var(--sun);text-decoration:none;border-bottom:1px solid currentColor}
 .ptlinks a.go{background:var(--sun);color:var(--ground);padding:5px 12px;
   border:0;letter-spacing:.03em}
 .ptlinks a.go:hover{filter:brightness(1.12)}
-.ptwarn{padding:12px 20px;margin:0;font-size:13.5px;color:var(--muted);
-  background:var(--ground);border-bottom:1px solid var(--line-soft)}
+.ptwarn{padding:13px 15px;margin:0;font-size:13.5px;color:var(--muted);
+  background:var(--panel);border:1px solid var(--line-soft);border-left:2px solid var(--sun)}
 .ptwarn b{color:var(--text)}
 .spin{display:inline-block;width:11px;height:11px;border:2px solid var(--line);
   border-top-color:var(--sun);border-radius:50%;animation:sp .7s linear infinite;
@@ -235,6 +253,21 @@ def script(max_radius=MAX_RADIUS_KM):
     var p=h.p, cl=net(p);
     var mc=cl>=2?'ok':(cl<0?'no':'w'), bc=p.total?'g':(cl>=2?'w':'b');
     var badge=p.total?('TOTALIDAD '+n(p.dur,0)+' s'):(n(p.obsc,1)+'% parcial');
+    // Totalidad en el filo de la sombra: se avisa donde se mira, no enterrado en el
+    // párrafo. No se cambia el orden -- la totalidad sigue siendo otra cosa -- pero el
+    // riesgo tiene que ser visible antes de conducir 100 km.
+    var risk='';
+    if(p.total && p.dur < 30){
+      var tip='Con '+n(p.dur,0)+' s est\u00e1s en el filo de la sombra. Mi c\u00e1lculo '+
+        'tiene un sesgo de \u00b13 s y no modela el perfil real del limbo lunar '+
+        '(los montes del borde de la Luna), que justo aqu\u00ed es lo que decide entre '+
+        'ver corona y no verla: podr\u00edan ser 0 s. Para un cazador de eclipses el '+
+        'riesgo compensa, porque unos segundos de corona no se parecen a nada. Para un '+
+        'plan en familia, un parcial casi seguro con mejor margen suele ser mejor '+
+        'idea. Moverse unos kil\u00f3metros hacia el centro de la franja lo resuelve.';
+      risk='<span class="risk" tabindex="0" role="note" aria-label="'+tip+'">'+
+           'AL BORDE \u00b7 RIESGO ALTO<span class="tip">'+tip+'</span></span>';
+    }
     function num(k,v,c){return '<div class="num '+(c||'')+'"><div class="k">'+k+
       '</div><div class="v">'+v+'</div></div>';}
     // El titular es el PUNTO. El municipio es solo dónde cae: ponerlo en grande hace
@@ -250,7 +283,8 @@ def script(max_radius=MAX_RADIUS_KM):
     return '<article class="site">'+
       '<div class="site-h"><h3 class="ptcoord">'+coord+'</h3>'+
       '<span class="place">'+(p.place? 'en el t&eacute;rmino de '+esc(p.place):'')+
-      '</span><span class="badge '+bc+'">'+badge+'</span></div>'+
+      '</span><span class="badges"><span class="badge '+bc+'">'+badge+
+      '</span>'+risk+'</span></div>'+
       '<div class="nums">'+
         num('distancia',n(h.d,1)+' km')+
         num('altitud',p.elev+' m')+
