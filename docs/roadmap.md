@@ -26,20 +26,36 @@
 
 Lo calculado está bien; lo que falla es cómo se presenta y qué falta comprobar.
 
-- [ ] **402 puntos (28 %) sin chequear contra árboles y edificios.** Overpass falló en
-      esos durante la pasada. Es reanudable (`./enrich.sh`, ~10 min) y la caché conserva
-      lo hecho. Mientras tanto se marcan «sin comprobar», nunca «limpio».
+- [ ] **582 puntos sin perfil de accesibilidad.** `./access.sh` completó 875 de 1.457;
+      en el resto Overpass no contestó. Reanudable: la caché guarda los aciertos, así
+      que una segunda pasada sólo reintenta los fallos. Se marcan «sin comprobar».
+- [ ] **Puntos sin chequear contra árboles y edificios**: `./enrich.sh` los completa.
+      Overpass se satura y va a rachas; es reanudable y la caché conserva lo hecho.
 - [ ] **Alturas de arbolado estimadas** (18 m de pinar maduro): OSM casi nunca las trae.
       Van marcadas como estimación. Mejorable con datos de altura de dosel si aparecen.
-- [ ] **Topónimos pobres** en unos pocos puntos («España» a secas): bajar el zoom de la
-      geocodificación inversa y reintentar solo esos.
 - [ ] **Ordenación en el borde de la sombra.** Una totalidad de 6 s se lista por delante
       de un parcial del 99,4 % con mejor margen. Se avisa en el texto, pero conviene
       revisar si el orden debería penalizar las duraciones bajo ~30 s, donde el error
       del cálculo y el perfil del limbo lunar pesan mucho.
 - [ ] **Perfil real del limbo lunar**: mueve los contactos algunos segundos, y justo en
       el borde de la franja es lo que decide entre 6 s y nada.
-- [ ] **Analítica**: sin decidir (nada / solo visitas / visitas + localidades buscadas).
+- [ ] **`Sa Cuina del Bisbe` (39,16/2,92)**: sobrevive al filtro tierra/mar porque tiene
+      topónimo propio, y por elevación (46 m) parece un islote del archipiélago de
+      Cabrera. Sin confirmar que sea tierra pisable.
+
+### Hecho en esta ronda (2026-08-05, tarde)
+- **Puntos en el mar fuera.** 12 de los 1.469 publicados no estaban en tierra: sobre el
+  mar SRTM vale 0, el horizonte sale impecable y escalaban a lo más alto del ranking.
+  Filtro en `recommend.drop_offshore`, con segunda consulta al zoom 16 antes de
+  descartar — que salvó 14 puntos de costa de verdad, entre ellos Gorliz y el Monte de
+  Arnela (Fisterra). **Topónimos pobres resueltos de paso**: quedan 4.
+- **Índice de apartados** en el margen derecho (`minimap.py`), con el lenguaje visual de
+  los panoramas: eje, marcas y el Sol como círculo.
+- **Distancias relativas al lector**: «km desde Vigo» en vez de «km desde Barcelona»,
+  recalculadas por el buscador. Y fuera el sesgo de origen de la prosa.
+- **Secciones «Aviso» y «Fuentes»** desplegadas por fin, con la cita corregida (Overpass,
+  no Nominatim, para árboles/edificios/vías) y sin la sección duplicada.
+- **Analítica**: Vercel Web Analytics puesta. Ver `pending-human.md` para lo que queda.
 
 ### Hecho en esta ronda
 - La ficha identifica un **punto con coordenadas**, no un municipio: el nombre del
@@ -52,24 +68,11 @@ Lo calculado está bien; lo que falla es cómo se presenta y qué falta comproba
 
 ## Estado al cerrar la sesión del 2026-08-05
 
-**En producción**: https://eclipse.alvarosolis.dev — 1.469 miradores, 1.067 con árboles
-y edificios comprobados, 24 tests verdes, verificación 13/13.
+**En producción**: https://eclipse.alvarosolis.dev — 1.457 miradores, 28 tests verdes.
 
-### ⚠️ Trabajo a medias (lo primero al retomar)
-- **Chequeo de accesibilidad interrumpido en ~375/1467.** `./access.sh` lo reanuda: la
-  caché de Overpass conserva lo hecho, así que solo consulta lo que falta (~80 min).
-  El código que lo consume (`finder_ui.py`: `acc_label`, `acc_class` y el texto de
-  acceso) **está escrito pero nunca se ha desplegado ni visto en pantalla**.
-- **`site/index.html` está sin reconstruir** con esos cambios y con las secciones nuevas
-  de «Aviso» y «Fuentes» de `overview.py`. Reconstruir con `./redeploy.sh` (~15 min,
-  recalcula el informe general).
-
-### 🔲 Pendiente de la fase «mejorar la visión»
-- 402 puntos (28 %) sin chequear contra árboles y edificios: `./enrich.sh`, ~10 min.
-- Alturas de arbolado estimadas (18 m): OSM casi nunca las trae.
-- Topónimos pobres en unos pocos puntos («España» a secas): bajar el zoom de la
-  geocodificación inversa y reintentar solo esos.
-- Perfil real del limbo lunar: es lo que decide entre 6 s y nada en el borde.
+Lo que quedó a medias de la sesión anterior está cerrado: el chequeo de accesibilidad
+terminó (875/1.457), y el sitio se reconstruyó, así que el perfil de acceso y las
+secciones «Aviso» y «Fuentes» **ya se ven en pantalla** por primera vez.
 
 ## Objetivo total
 
