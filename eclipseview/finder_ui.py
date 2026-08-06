@@ -346,6 +346,17 @@ def script(max_radius=MAX_RADIUS_KM):
     if(p.dur_limb===undefined) return p.dur;
     return Math.max(p.dur, p.dur_limb);
   }
+  // Un punto SIN totalidad no puede leerse "100,0%": 99,951 redondeado a una decimal
+  // da 100,0 y, pegado a la palabra "parcial", parece un fallo del cálculo justo en
+  // los puntos donde más se mira. Sólo cuando el redondeo satura se trunca en vez de
+  // redondear —hacia abajo, que nunca promete de más—, y truncar no puede llegar a
+  // 100 porque el valor es menor que 100.
+  function obscTxt(p,d){
+    d=(d==null)?1:d;
+    var f=Math.pow(10,d);
+    if(!p.total && Math.round(p.obsc*f)/f>=100) return n(Math.floor(p.obsc*f)/f,d);
+    return n(p.obsc,d);
+  }
 
   // Accesibilidad a partir de las etiquetas de OpenStreetMap. Lo que NO se puede es
   // interpretar el silencio: la mayoría de vías no llevan surface/smoothness, así que
@@ -375,7 +386,7 @@ def script(max_radius=MAX_RADIUS_KM):
     // Cuando los dos modelos difieren de verdad, la chapa enseña el RANGO en vez de un
     // número redondo: fingir precisión donde no la hay es lo que había que quitar.
     var badge;
-    if(!p.total){ badge=n(p.obsc,1)+'% parcial'; }
+    if(!p.total){ badge=obscTxt(p,1)+'% parcial'; }
     else if(p.dur_limb!==undefined && Math.abs(durHi(p)-durLo(p))>=5){
       badge='TOTALIDAD '+n(durLo(p),0)+'–'+n(durHi(p),0)+' s';
     } else { badge='TOTALIDAD '+n(p.dur,0)+' s'; }
@@ -401,7 +412,7 @@ def script(max_radius=MAX_RADIUS_KM):
         'perfil real de su limbo —los montes del borde, medidos por la sonda LRO— '+
         'salen unos '+n(p.dur_limb,0)+' s. Puede que veas corona unos segundos, o sólo '+
         'las perlas de Baily. Si vas a por la corona, muévete hacia el centro de la '+
-        'franja; si te pilla de paso, mira igual: un '+n(p.obsc,1)+'% ya es un '+
+        'franja; si te pilla de paso, mira igual: un '+obscTxt(p,1)+'% ya es un '+
         'espectáculo.';
       risk='<span class="risk" tabindex="0" role="note" aria-label="'+tip+'">'+
            'PUEDE HABER UNOS SEGUNDOS<span class="tip">'+tip+'</span></span>';
@@ -436,7 +447,7 @@ def script(max_radius=MAX_RADIUS_KM):
       '<div class="nums">'+
         num('distancia',n(h.d,1)+' km')+
         num('altitud',p.elev+' m')+
-        num('sol oculto',(p.total?'100%':n(p.obsc,1)+'%'),'hi')+
+        num('sol oculto',(p.total?'100%':obscTxt(p,1)+'%'),'hi')+
         num('altura del sol',deg(p.alt,2))+
         num('horizonte real',deg(p.hz,2,true))+
         num('margen libre',deg(cl,2,true),mc)+
@@ -474,7 +485,7 @@ def script(max_radius=MAX_RADIUS_KM):
       'del c&aacute;lculo es alto y basta desplazarse unos kil&oacute;metros hacia el '+
       'centro de la franja para ganar mucho.';
     else if(p.total) s+=' Aquí hay <b>totalidad: '+n(p.dur,0)+' s</b>, de '+p.t2+' a '+p.t3+'.';
-    else s+=' Eclipse <b>parcial</b>: '+n(p.obsc,2)+'% del disco oculto, sin corona.';
+    else s+=' Eclipse <b>parcial</b>: '+obscTxt(p,2)+'% del disco oculto, sin corona.';
     if(p.obs_ok && p.obs>0 && p.obs_what){
       s+=' Ojo: hay <b>'+esc(p.obs_what)+'</b> de unos '+n(p.obs_h,0)+' m a '+
          n(p.obs_d,0)+' m, que levanta el horizonte a '+deg(p.obs,2,true)+
@@ -545,7 +556,7 @@ def script(max_radius=MAX_RADIUS_KM):
       '" cy="'+(y0-mo[1]*dp).toFixed(2)+'" r="'+rm.toFixed(2)+'"/>');
     if(hid) o.push('<circle class="hidering" cx="'+x0.toFixed(1)+'" cy="'+y0.toFixed(1)+
       '" r="'+(rs*1.9).toFixed(1)+'"/>');
-    var lab=p.total?('TOTALIDAD '+p.t):(n(p.obsc,1)+'% oculto \\u00b7 '+p.t);
+    var lab=p.total?('TOTALIDAD '+p.t):(obscTxt(p,1)+'% oculto \\u00b7 '+p.t);
     var halo=p.total?rs*2.6:rs*1.6, ly=Math.max(y0-halo-8,pt+11);
     o.push('<line class="callout" x1="'+x0.toFixed(1)+'" y1="'+(ly+3).toFixed(1)+
       '" x2="'+x0.toFixed(1)+'" y2="'+(y0-halo).toFixed(1)+'"/>');

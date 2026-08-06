@@ -49,12 +49,36 @@ desarrollo:
    parecería despejado. Un test comprueba que se piden teselas muy al oeste.
 4. **Sesgo de duración.** Un test asegura que sigue siendo pequeño (<5 %) y positivo,
    para que una regresión que lo invierta o lo dispare se vea.
+5. **El limbo lunar no puede colarse en la cifra que se publica.** Un test comprueba
+   que `circumstances(use_limb=False)` sigue siendo el defecto: el IGN y la NASA
+   publican con limbo medio y la gente contrasta con ellos.
+6. **«100,0% parcial».** 97 de los 1.456 puntos tienen entre 99,951 % y 99,999 % del
+   disco oculto, y redondeados a una decimal se pintaban como `100,0% parcial`, que
+   leído en frío es una contradicción justo en los puntos del filo. Ahora, y sólo
+   cuando el redondeo satura, se trunca hacia abajo. El test **ejecuta el JS que se
+   publica** con `node`, no una copia en Python: una reimplementación aprobaría
+   aunque el navegador hiciera otra cosa.
+
+## Lo que sí se comprueba ya (y antes no)
+
+- **El perfil real del limbo lunar** (`limb.py`): topografía LOLA/LRO más la libración
+  del día, sacada de los núcleos NAIF. No manda sobre la cifra publicada —es la
+  segunda opinión— pero decide el aviso del filo. Contrastado por tres vías: la
+  amplitud de la libración cuadra con la publicada, invertir el convenio de signos da
+  el mismo resultado, y el radio medio del borde cae sobre la esfera calibrada.
+- **Árboles y edificios**: los 1.456 puntos publicados están comprobados contra
+  OpenStreetMap, y el margen que manda es el neto.
 
 ## Lo que NO está verificado
 
-- El relieve es SRTM: **no hay árboles, edificios ni naves**. Por eso se exige margen.
+- El relieve de base es SRTM a 30 m: la silueta lejana no lleva vegetación. Los
+  árboles y edificios se añaden aparte, desde OSM, y sólo donde OSM los tiene.
+- Las **alturas** de arbolado casi nunca vienen en OSM: se estiman.
 - La refracción cerca del horizonte varía con la temperatura; puede mover el terreno
   lejano una o dos décimas de grado.
-- No se usa el perfil real del limbo lunar (los montes de la Luna), que mueve los
-  contactos algunos segundos justo en el borde de la sombra.
-- La climatología de nubes es estadística publicada, **no un pronóstico**.
+- El limbo está medido a unos 2 km de resolución: en el borde de la sombra eso son
+  segundos, y no hay ninguna referencia publicada con limbo corregido contra la que
+  validarlo.
+- La climatología de nubes es estadística publicada, **no un pronóstico**. El
+  pronóstico en vivo (Open-Meteo) es otra cosa y se marca como tal.
+- **Nadie ha ido a un punto a mirarlo.** Es lo único que ningún modelo cierra.

@@ -497,5 +497,86 @@ class TestOverpassIsPolite(unittest.TestCase):
         self.assertGreater(max(llamadas), 1, 'lo intentó primero en lote')
 
 
+class TestPartialNeverReadsAsHundred(unittest.TestCase):
+    """Un punto sin totalidad no puede pintar «100,0% parcial»: es redondeo, pero se
+    lee como una contradicción justo en los puntos del filo, que son los que más se
+    miran. El JS que se publica se ejecuta de verdad aquí, no se reimplementa: una
+    copia en Python aprobaría aunque el navegador hiciera otra cosa."""
+
+    def _obsc_js(self):
+        """Saca del script publicado las dos funciones que dan el texto."""
+        from eclipseview import finder_ui
+        src = finder_ui.script()
+        trozos = []
+        for nombre in ('function n(', 'function obscTxt('):
+            i = src.index(nombre)          # si no está, el test peta: es lo que queremos
+            j = src.index('\n  }', i) + 4 if nombre == 'function obscTxt(' \
+                else src.index('\n', i) + 1
+            trozos.append(src[i:j])
+        return '\n'.join(trozos)
+
+    def test_every_render_goes_through_the_guard(self):
+        from eclipseview import finder_ui
+        src = finder_ui.script()
+        # la única llamada cruda que queda es la del propio guardia
+        self.assertEqual(src.count('n(p.obsc'), 1,
+                         'la obscuración se pinta con obscTxt(), nunca con n(p.obsc,…)')
+        self.assertGreaterEqual(src.count('obscTxt(p,'), 5,
+                                'los cinco sitios que pintan obscuración usan el guardia')
+
+    @unittest.skipUnless(__import__('shutil').which('node'), 'sin node para ejecutar el JS')
+    def test_the_shipped_js_never_prints_a_hundred_for_a_partial(self):
+        import json as _json
+        import subprocess
+        import tempfile
+        # Los valores que saturan de verdad en el dataset publicado van entre 99,951 y
+        # 99,999; se añaden los extremos y un valor normal para que el guardia no se
+        # coma los casos corrientes.
+        casos = [99.951, 99.99, 99.999, 99.9999, 92.38, 50.0]
+        harness = self._obsc_js() + '\n' + (
+            'var out=[];' +
+            'JSON.parse(process.argv[2]).forEach(function(v){' +
+            '  out.push([obscTxt({obsc:v,total:false},1), obscTxt({obsc:v,total:false},2)]);' +
+            '});' +
+            'console.log(JSON.stringify(out));')
+        with tempfile.NamedTemporaryFile('w', suffix='.js', delete=False,
+                                         encoding='utf-8') as fh:
+            fh.write(harness)
+            ruta = fh.name
+        try:
+            salida = subprocess.run(['node', ruta, _json.dumps(casos)],
+                                    capture_output=True, text=True, timeout=30)
+        finally:
+            os.unlink(ruta)
+        self.assertEqual(salida.returncode, 0, salida.stderr)
+        textos = _json.loads(salida.stdout)
+        for v, textos_v in zip(casos, textos):
+            for d, t in zip((1, 2), textos_v):
+                leido = float(t.replace(',', '.'))
+                self.assertLess(leido, 100.0,
+                                f'{v}% sin totalidad se pinta «{t}%», y eso es un 100')
+                if round(v, d) >= 100.0:      # sólo donde el redondeo saturaba
+                    self.assertLessEqual(leido, v,
+                                         'ahí trunca: nunca promete más de lo medido')
+        # y fuera del filo se sigue redondeando, que es lo de siempre
+        self.assertEqual(textos[4], ['92,4', '92,38'],
+                         'un valor corriente no cambia de formato')
+
+    def test_the_dataset_still_exercises_the_guard(self):
+        """Si un día ningún punto satura, este test avisa de que el guardia dejó de
+        estar probado por datos reales en vez de dejarlo ahí sin comprobar."""
+        from eclipseview.paths import DATA_DIR
+        ruta = os.path.join(DATA_DIR, 'points.json')
+        if not os.path.exists(ruta):
+            self.skipTest('sin points.json')
+        import json as _json
+        with open(ruta, encoding='utf-8') as fh:
+            pts = _json.load(fh)['points']
+        saturan = [p for p in pts
+                   if not p['total'] and round(p['obsc'], 1) >= 100.0]
+        self.assertTrue(saturan,
+                        'ningún punto satura ya: revisa si el guardia sigue haciendo falta')
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

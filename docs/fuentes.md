@@ -18,6 +18,10 @@ mismos datos, mismos números.
 | Efemérides planetarias | [JPL DE421](https://ssd.jpl.nasa.gov/planets/eph_export.html) vía Skyfield | dominio público |
 | Relieve SRTM 1″ (~30 m) | [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) | dominio público |
 | Topónimos y geocodificación | [Nominatim / OpenStreetMap](https://nominatim.openstreetmap.org/) | ODbL |
+| Árboles, edificios y accesos | [Overpass / OpenStreetMap](https://overpass-api.de/) | ODbL |
+| Topografía del limbo lunar | [LOLA / LRO (NASA PDS)](https://pds-geosciences.wustl.edu/lro/lro-l-lola-3-rdr-v1/) | dominio público |
+| Orientación de la Luna (libración) | [NAIF/JPL `moon_pa_de421`](https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/) | dominio público |
+| Pronóstico de nubes (en vivo) | [Open-Meteo](https://open-meteo.com/) | CC BY 4.0, sin clave |
 | Climatología de nubes de agosto | [Eclipsophile — Jay Anderson](https://eclipsophile.com/tse2026/) | citada, no redistribuida |
 | Circunstancias publicadas (contraste) | [IGN](https://eclipses.ign.es/eclipse-total-sol-de-12-de-agosto-2026.html), [NASA GSFC](https://eclipse.gsfc.nasa.gov/) | citadas |
 | Duración en Tarragona (contraste) | [Diari de Tarragona](https://www.diaridetarragona.com/tarragona/258007/mapa-podras-ver-eclipse-sol-casa-provincia-tarragona.html) | citada |
