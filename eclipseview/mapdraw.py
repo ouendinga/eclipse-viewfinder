@@ -31,19 +31,56 @@ def png_bytes(rgb):
             + chunk(b'IEND', b''))
 
 
+def _block_max(a, f):
+    """Reduce por un factor ENTERO quedándose con el máximo de cada bloque de f x f.
+
+    Por factor y no por forma de destino: con una forma cualquiera el bloque no cae
+    exacto, hay que rellenar, y el relleno corre el eje — que es justo el fallo que se
+    estaba arreglando. Con factor entero, la celda (i,j) cubre siempre las filas
+    i*f..i*f+f-1, así que la coordenada del resultado es la del origen dividida por f.
+    """
+    r = int(np.ceil(a.shape[0] / f))
+    c = int(np.ceil(a.shape[1] / f))
+    pad = np.pad(a, ((0, r * f - a.shape[0]), (0, c * f - a.shape[1])), mode='edge')
+    return pad.reshape(r, f, c, f).max(axis=(1, 3))
+
+
 def terrain_raster():
+    """Relieve del mapa, alineado con la MISMA proyección que dibuja los puntos.
+
+    Antes se recortaba el DEM por índices y se estiraba el recorte hasta llenar el
+    lienzo. Como el mapa pide más sur (38,4°) y más este (4,4°) de lo que el DEM cubre
+    (39°, 4°), el recorte salía corto y NumPy lo truncaba en silencio: 3.361 filas donde
+    hacían falta 3.721. Al estirarlo, el relieve entero quedaba desplazado respecto a
+    los puntos, y el error crecía hacia el sur y el este — o sea, Valencia y Baleares.
+    Se veía como puntos flotando en el agua junto a la costa.
+
+    Ahora cada píxel de salida sabe su latitud y longitud y va a buscar SU celda. Lo que
+    cae fuera del DEM se pinta de mar, que es lo honesto: ahí no hay dato.
+    """
     from .terrain import dem, PER_DEG, LAT_N, LON_W
     d = dem()
-    r0 = int((LAT_N - LA_N) * PER_DEG); r1 = int((LAT_N - LA_S) * PER_DEG)
-    c0 = int((LO_W - LON_W) * PER_DEG); c1 = int((LO_E - LON_W) * PER_DEG)
-    sub = d[r0:r1, c0:c1].astype(np.float32)
-    # nearest-neighbour resample to W x H
-    yi = (np.linspace(0, sub.shape[0] - 1, H)).astype(np.int64)
-    xi = (np.linspace(0, sub.shape[1] - 1, W)).astype(np.int64)
-    z = sub[np.ix_(yi, xi)]
+    nr, nc = d.shape
+
+    lat = LA_N - (np.arange(H) + 0.5) / H * (LA_N - LA_S)
+    lon = LO_W + (np.arange(W) + 0.5) / W * (LO_E - LO_W)
+    ri = np.rint((LAT_N - lat) * PER_DEG).astype(np.int64)
+    ci = np.rint((lon - LON_W) * PER_DEG).astype(np.int64)
+    fuera = ((ri < 0) | (ri >= nr))[:, None] | ((ci < 0) | (ci >= nc))[None, :]
+    z = d[np.clip(ri, 0, nr - 1)][:, np.clip(ci, 0, nc - 1)].astype(np.float32)
+
+    # El mar se decide con el MÁXIMO del bloque de origen, no con el píxel que toque:
+    # cogiendo uno de cada nueve, en costa dentada el elegido podía venir del agua de al
+    # lado. Un bloque sólo es mar si TODO él lo es.
+    f = max(1, int(round((LA_N - LA_S) * PER_DEG / H)))
+    pooled = _block_max(d.astype(np.float32), f)
+    pr = ((LAT_N - lat) * PER_DEG / f).astype(np.int64)
+    pc = ((lon - LON_W) * PER_DEG / f).astype(np.int64)
+    zmax = pooled[np.clip(pr, 0, pooled.shape[0] - 1)][:,
+                  np.clip(pc, 0, pooled.shape[1] - 1)]
 
     rgb = np.zeros((H, W, 3), dtype=np.uint8)
-    sea = z <= 0
+    sea = (zmax <= 0) | fuera
     # muted ink-on-paper palette; land ramps warm-grey -> pale
     t = np.clip(z / 2200.0, 0, 1)
     rgb[..., 0] = (68 + t * 150).astype(np.uint8)

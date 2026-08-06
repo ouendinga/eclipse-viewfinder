@@ -39,9 +39,9 @@ Lo calculado está bien; lo que falla es cómo se presenta y qué falta comproba
       del cálculo y el perfil del limbo lunar pesan mucho.
 - [ ] **Perfil real del limbo lunar**: mueve los contactos algunos segundos, y justo en
       el borde de la franja es lo que decide entre 6 s y nada.
-- [ ] **`Sa Cuina del Bisbe` (39,16/2,92)**: sobrevive al filtro tierra/mar porque tiene
-      topónimo propio, y por elevación (46 m) parece un islote del archipiélago de
-      Cabrera. Sin confirmar que sea tierra pisable.
+- [x] **`Sa Cuina del Bisbe` (39,16/2,92)**: confirmado que es tierra. Tiene una pista
+      (`track`, firme de tierra) a 1.135 m, así que es un islote con acceso a pie, no un
+      bajo submarino. Se queda.
 
 ### Hecho en esta ronda (2026-08-05, tarde)
 - **Puntos en el mar fuera.** 12 de los 1.469 publicados no estaban en tierra: sobre el
