@@ -60,6 +60,14 @@ CITATIONS = {
         'label': 'Open-Meteo',
         'url': 'https://open-meteo.com/',
     },
+    'lola': {
+        'label': 'LOLA / LRO — topografía lunar (NASA PDS)',
+        'url': 'https://pds-geosciences.wustl.edu/lro/lro-l-lola-3-rdr-v1/',
+    },
+    'naif': {
+        'label': 'NAIF/JPL — orientación de la Luna (moon_pa_de421)',
+        'url': 'https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/',
+    },
 }
 
 # --------------------------------------------------------------- verification

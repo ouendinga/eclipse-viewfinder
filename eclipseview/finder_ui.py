@@ -268,8 +268,14 @@ def script(max_radius=MAX_RADIUS_KM):
     var hits=DATA.points.map(function(p){
       return {p:p,d:km(ORIGIN.lat,ORIGIN.lon,p.lat,p.lon)};
     }).filter(function(h){return h.d<=rad;});
+    // Una totalidad de 5 s se listaba por delante de un parcial del 99,4 % con mucho
+    // mejor margen, sólo por ser totalidad. Ahora "totalidad" significa la que
+    // confirman LOS DOS modelos: el de esfera calibrada contra el IGN y el del perfil
+    // real del limbo lunar. Si sólo la ve uno, no encabeza la lista: se coloca entre
+    // los parciales por su margen, con su aviso, porque puede no haber corona.
     hits.sort(function(a,b){
-      if(b.p.total!==a.p.total) return b.p.total-a.p.total;
+      var A=solida(a.p), B=solida(b.p);
+      if(A!==B) return B-A;
       return net(b.p)-net(a.p);});
 
     var url=new URL(location); url.searchParams.set('lat',ORIGIN.lat.toFixed(4));
@@ -323,6 +329,24 @@ def script(max_radius=MAX_RADIUS_KM):
   // ser un dato bueno.
   function net(p){ return (p.clear_net!==undefined && p.obs_ok) ? p.clear_net : p.clear; }
 
+  // Totalidad SÓLIDA: la que ven los dos modelos. El de esfera está calibrado contra
+  // las cifras publicadas del IGN y la NASA; el otro usa el perfil real del limbo lunar
+  // (topografía LOLA + la libración del día). Mientras no haya dato de limbo se cae al
+  // criterio de siempre, no se inventa una confirmación.
+  function solida(p){
+    if(p.total_limb===undefined) return p.total ? 1 : 0;
+    return (p.total && p.total_limb) ? 1 : 0;
+  }
+  // Rango de duración según los dos modelos: es la incertidumbre de verdad, medida.
+  function durLo(p){
+    if(p.dur_limb===undefined) return p.dur;
+    return Math.min(p.dur, p.total_limb ? p.dur_limb : 0);
+  }
+  function durHi(p){
+    if(p.dur_limb===undefined) return p.dur;
+    return Math.max(p.dur, p.dur_limb);
+  }
+
   // Accesibilidad a partir de las etiquetas de OpenStreetMap. Lo que NO se puede es
   // interpretar el silencio: la mayoría de vías no llevan surface/smoothness, así que
   // «sin datos» se dice, no se traduce por «fácil».
@@ -348,19 +372,35 @@ def script(max_radius=MAX_RADIUS_KM):
   function card(h){
     var p=h.p, cl=net(p);
     var mc=cl>=2?'ok':(cl<0?'no':'w'), bc=p.total?'g':(cl>=2?'w':'b');
-    var badge=p.total?('TOTALIDAD '+n(p.dur,0)+' s'):(n(p.obsc,1)+'% parcial');
+    // Cuando los dos modelos difieren de verdad, la chapa enseña el RANGO en vez de un
+    // número redondo: fingir precisión donde no la hay es lo que había que quitar.
+    var badge;
+    if(!p.total){ badge=n(p.obsc,1)+'% parcial'; }
+    else if(p.dur_limb!==undefined && Math.abs(durHi(p)-durLo(p))>=5){
+      badge='TOTALIDAD '+n(durLo(p),0)+'–'+n(durHi(p),0)+' s';
+    } else { badge='TOTALIDAD '+n(p.dur,0)+' s'; }
     // Totalidad en el filo de la sombra: se avisa donde se mira, no enterrado en el
     // párrafo. No se cambia el orden -- la totalidad sigue siendo otra cosa -- pero el
     // riesgo tiene que ser visible antes de conducir 100 km.
-    var risk='';
-    if(p.total && p.dur < 30){
-      var tip='Con '+n(p.dur,0)+' s est\u00e1s en el filo de la sombra. Mi c\u00e1lculo '+
-        'cuadra con el IGN dentro de 1 s, pero no modela el perfil real del limbo '+
-        'lunar (los montes del borde de la Luna), que justo aqu\u00ed es lo que decide '+
-        'entre ver corona y no verla: podr\u00edan ser 0 s. Para un cazador de eclipses el '+
-        'riesgo compensa, porque unos segundos de corona no se parecen a nada. Para un '+
-        'plan en familia, un parcial casi seguro con mejor margen suele ser mejor '+
-        'idea. Moverse unos kil\u00f3metros hacia el centro de la franja lo resuelve.';
+    // El aviso del filo ya no es gen\u00e9rico: lo decide el contraste entre los dos
+    // modelos. Antes dec\u00eda "podr\u00edan ser 0 s" siempre, que era una suposici\u00f3n.
+    var risk='', tip='';
+    if(p.total && p.total_limb===false){
+      tip='Aqu\u00ed los dos modelos NO se ponen de acuerdo. Con la Luna como esfera salen '+
+        n(p.dur,0)+' s de totalidad, pero con el perfil real de su limbo \u2014los montes '+
+        'y valles del borde, medidos por la sonda LRO\u2014 no queda totalidad. Puede que '+
+        's\u00f3lo veas las perlas de Baily. Unos kil\u00f3metros hacia el centro de la franja '+
+        'lo resuelven.';
+      risk='<span class="risk" tabindex="0" role="note" aria-label="'+tip+'">'+
+           'SIN TOTALIDAD SEGURA<span class="tip">'+tip+'</span></span>';
+    } else if(p.total && durLo(p) < 30){
+      tip='Con unos '+n(durLo(p),0)+' s est\u00e1s en el filo de la sombra. Los dos modelos '+
+        'ven totalidad \u2014el de esfera, calibrado contra el IGN, y el del perfil real '+
+        'del limbo lunar\u2014 y le dan entre '+n(durLo(p),0)+' y '+n(durHi(p),0)+' s. Aun '+
+        'as\u00ed es poco: el limbo est\u00e1 medido a unos 2 km de resoluci\u00f3n y ah\u00ed eso son '+
+        'segundos. Para un cazador de eclipses compensa, porque unos segundos de '+
+        'corona no se parecen a nada. Para un plan en familia, un parcial casi seguro '+
+        'con mejor margen suele ser mejor idea.';
       risk='<span class="risk" tabindex="0" role="note" aria-label="'+tip+'">'+
            'AL BORDE \u00b7 RIESGO ALTO<span class="tip">'+tip+'</span></span>';
     }

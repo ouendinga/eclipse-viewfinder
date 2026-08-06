@@ -301,6 +301,80 @@ class TestStreetViewNeedsARoad(unittest.TestCase):
         self.assertNotIn('sv', p)
 
 
+class TestLunarLimb(unittest.TestCase):
+    """El perfil real del limbo. Se salta si no están los datos (LOLA + núcleos NAIF),
+    que son 34 MB y no se versionan."""
+
+    @classmethod
+    def setUpClass(cls):
+        from eclipseview import limb
+        if not limb.available():
+            raise unittest.SkipTest('sin datos del limbo (data/moon/)')
+        cls.limb = limb
+
+    def _moon_vector(self):
+        from skyfield.api import wgs84
+        from eclipseview.ephem import EARTH, MOON, _ts
+        t = _ts.utc(2026, 8, 12, 18, 30, 0)
+        obs = EARTH + wgs84.latlon(42.537, -4.3366, elevation_m=830)
+        return t, obs.at(t).observe(MOON).apparent()
+
+    def test_libration_amplitude_matches_the_published_one(self):
+        """Si la orientación estuviera mal montada, la libración no oscilaría lo que
+        oscila. Es la comprobación que ata todo lo demás."""
+        import numpy as np
+        from eclipseview.ephem import EARTH, MOON, _ts
+        lats, lons = [], []
+        for d in range(30):
+            t = _ts.utc(2026, 7, 20 + d)
+            m = EARTH.at(t).observe(MOON).apparent()
+            u = -m.position.km
+            u = u / np.linalg.norm(u)
+            v = self.limb.rotation_at(t) @ u
+            lats.append(np.degrees(np.arcsin(v[2])))
+            lons.append(np.degrees(np.arctan2(v[1], v[0])))
+        self.assertGreater(max(lats) - min(lats), 10.0, 'libración en latitud muy corta')
+        self.assertLess(max(lats) - min(lats), 18.0, 'libración en latitud disparada')
+        self.assertGreater(max(lons) - min(lons), 10.0)
+        self.assertLess(max(lons) - min(lons), 20.0)
+
+    def test_the_profile_has_real_lunar_relief(self):
+        t, m = self._moon_vector()
+        _, r = self.limb.profile(t, m.position.km)
+        self.assertGreater(r.max() - r.min(), 5.0, 'el borde sale demasiado liso')
+        self.assertLess(r.max() - r.min(), 25.0, 'relieve imposible en la Luna')
+        self.assertAlmostEqual(r.mean(), 1736.7, delta=1.5)
+
+    def test_the_sign_convention_cancels(self):
+        """El ángulo de posición y el muestreo del limbo usan la misma base, así que
+        invertir el este no puede cambiar el resultado. Si lo cambia, hay un lado del
+        limbo que se está leyendo al revés — y en el filo eso invierte la respuesta."""
+        t, m = self._moon_vector()
+        from eclipseview.ephem import SUN
+        from skyfield.api import wgs84
+        from eclipseview.ephem import EARTH
+        obs = EARTH + wgs84.latlon(42.537, -4.3366, elevation_m=830)
+        s = obs.at(t).observe(SUN).apparent()
+        rot = self.limb.rotation_at(t)
+        off = s.position.km - m.position.km
+        a = self.limb.moon_radius_toward_rot(rot, m.position.km, off)
+        real = self.limb._basis
+        self.limb._basis = lambda v: (lambda r: (r[0], r[1], -r[2]))(real(v))
+        try:
+            b = self.limb.moon_radius_toward_rot(rot, m.position.km, off)
+        finally:
+            self.limb._basis = real
+        self.assertAlmostEqual(a, b, places=9)
+
+    def test_the_headline_duration_still_uses_the_sphere(self):
+        """La cifra que se publica tiene que seguir cuadrando con el IGN: si alguien
+        pone el limbo por defecto, este test lo caza."""
+        import inspect
+        from eclipseview import ephem
+        sig = inspect.signature(ephem.circumstances)
+        self.assertIs(sig.parameters['use_limb'].default, False)
+
+
 class TestLunarRadiusCalibration(unittest.TestCase):
     """El radio umbral no se copia de ningún sitio: se ajusta a las duraciones
     publicadas (NASA e IGN). Este test rehace el ajuste, así que si alguien toca el

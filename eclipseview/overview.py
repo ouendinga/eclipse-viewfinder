@@ -370,6 +370,9 @@ def render(data, finder_html='', finder_css='', finder_js=''):
         {sources.cite('de421')}</td><td>dominio público</td></tr>
     <tr><td>Relieve y perfil del horizonte</td><td>SRTM 1&Prime; (~30 m) vía
         {sources.cite('srtm')}</td><td>dominio público</td></tr>
+    <tr><td>Perfil real del limbo lunar (los montes del borde de la Luna, que en el
+        filo de la sombra deciden si hay corona)</td>
+        <td>{sources.cite('lola')} y {sources.cite('naif')}</td><td>dominio público</td></tr>
     <tr><td>Árboles, edificios y vías de acceso</td><td>{sources.cite('overpass')}</td><td>ODbL</td></tr>
     <tr><td>Topónimos</td><td>{sources.cite('osm')}</td><td>ODbL</td></tr>
     <tr><td>Nubosidad de agosto (climatología, lo que <i>suele</i> pasar)</td>
@@ -399,8 +402,11 @@ def render(data, finder_html='', finder_css='', finder_js=''):
       a 138 s de totalidad: el peor desvío es de
       <b>{i18n.number(LANG, sources.LUNAR_UMBRAL_RADIUS['max_dev_s'], 0)} s</b>.
       Para horarios oficiales, el IGN.</li>
-      <li>No modelo el <b>perfil real del limbo lunar</b>. Justo en el borde de la
-      franja, eso es lo que decide entre ver corona y no verla.</li>
+      <li>El <b>perfil real del limbo lunar</b> sí está modelado, con la topografía
+      {sources.cite('lola')} y la libración del día: en el filo de la sombra es lo que
+      decide entre ver corona y no verla. Pero está medido a unos <b>2 km</b> sobre el
+      borde, y ahí eso son segundos: donde los dos modelos discrepan, la ficha lo
+      dice en vez de dar un número redondo.</li>
       <li>El relieve es SRTM: <b>no ve árboles ni edificios</b>. Eso se cubre aparte
       con OpenStreetMap, pero <b>no en todos los puntos</b> — los que no se han podido
       comprobar lo dicen.</li>

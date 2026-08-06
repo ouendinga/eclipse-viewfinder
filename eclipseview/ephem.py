@@ -29,8 +29,14 @@ _ts = _loader.timescale()
 EARTH, SUN, MOON = _eph['earth'], _eph['sun'], _eph['moon']
 
 
-def _radii_and_sep(observer, t):
-    """Return (separation_deg, r_sun_deg, r_moon_deg) as arrays."""
+def _radii_and_sep(observer, t, limb_rot=None):
+    """Return (separation_deg, r_sun_deg, r_moon_deg) as arrays.
+
+    Con `limb_rot` (una matriz de rotación de la Luna, ver `limb_rotation`) el radio
+    lunar deja de ser una esfera y sale del PERFIL REAL del limbo, leído en el ángulo
+    de posición hacia el que se separa el Sol: es por ahí por donde asoma la fotosfera,
+    así que es ese trozo de borde el que decide si hay totalidad.
+    """
     obs = observer.at(t)
     s = obs.observe(SUN).apparent()
     m = obs.observe(MOON).apparent()
@@ -38,13 +44,37 @@ def _radii_and_sep(observer, t):
     d_sun = s.distance().km
     d_moon = m.distance().km
     r_sun = np.degrees(np.arcsin(R_SUN_KM / d_sun))
-    r_moon = np.degrees(np.arcsin(R_MOON_KM / d_moon))
+    if limb_rot is None:
+        r_moon = np.degrees(np.arcsin(R_MOON_KM / d_moon))
+    else:
+        from . import limb
+        # el vector del centro de la Luna al centro del Sol, en el plano del cielo
+        offset = s.position.km - m.position.km
+        rk = limb.moon_radius_toward_rot(limb_rot, m.position.km, offset)
+        r_moon = np.degrees(np.arcsin(rk / d_moon))
     return np.atleast_1d(sep), np.atleast_1d(r_sun), np.atleast_1d(r_moon)
 
 
-def _g_total(observer, t):
+def limb_rotation(t):
+    """Orientación de la Luna en `t`, o None si no están los datos de LOLA/NAIF.
+
+    Se calcula UNA vez por punto y se reutiliza en toda la bisección: la Luna gira medio
+    grado por hora, así que dentro del minuto que dura la totalidad la cara que enseña
+    es la misma, y recalcular la matriz en cada iteración multiplicaría por veinte el
+    coste sin mover un metro el resultado.
+    """
+    from . import limb
+    if not limb.available():
+        return None
+    try:
+        return limb.rotation_at(t)
+    except Exception:
+        return None
+
+
+def _g_total(observer, t, limb_rot=None):
     """>0 while the observer is inside the umbra (total eclipse)."""
-    sep, r_sun, r_moon = _radii_and_sep(observer, t)
+    sep, r_sun, r_moon = _radii_and_sep(observer, t, limb_rot)
     return (r_moon - r_sun) - sep
 
 
@@ -101,8 +131,18 @@ def _bisect(observer, f, tjd_a, tjd_b, tol_s=0.02):
     return 0.5 * (tjd_lo + tjd_hi)
 
 
-def circumstances(lat, lon, elev_m=0.0, coarse_step_s=30.0):
-    """Full local circumstances. Returns dict (or partial-only / no-eclipse info)."""
+def circumstances(lat, lon, elev_m=0.0, coarse_step_s=30.0, use_limb=False):
+    """Full local circumstances. Returns dict (or partial-only / no-eclipse info).
+
+    `use_limb=False` por defecto, y no es pereza: el IGN y la NASA publican sus
+    duraciones con limbo MEDIO por convenio, y quien mire esta web va a contrastar con
+    el IGN. Cambiar el número de portada por otro que no cuadra con el suyo sería peor
+    servicio aunque el modelo sea más fino — y además la verificación del proyecto se
+    apoya justo en esa comparación.
+
+    Con `use_limb=True` se usa el perfil real del limbo (ver `limb.py`). Eso es la
+    segunda opinión que decide la pregunta del filo: ¿hay corona o no la hay?
+    """
     observer = EARTH + wgs84.latlon(lat, lon, elevation_m=elev_m)
 
     # Coarse scan of the window that covers Spain: 17:30-19:30 UTC
@@ -162,13 +202,27 @@ def circumstances(lat, lon, elev_m=0.0, coarse_step_s=30.0):
     # Totality is decided at the instant of maximum eclipse (minimum separation),
     # not from the coarse grid -- near the path edges totality can last only a few
     # seconds and would fall between coarse samples.
-    if _g_total(observer, _ts.tt_jd(tt_max))[0] <= 0:
+    # El limbo REAL decide los contactos. La orientación de la Luna se calcula una sola
+    # vez, en el máximo: dentro del par de minutos que dura esto la cara que enseña no
+    # cambia, y recalcularla en cada iteración de la bisección multiplicaría el coste
+    # sin mover el resultado.
+    rot = limb_rotation(_ts.tt_jd(tt_max)) if use_limb else None
+    gt = (lambda o, tt: _g_total(o, tt, rot)) if rot is not None else _g_total
+
+    if gt(observer, _ts.tt_jd(tt_max))[0] <= 0:
+        out['limb'] = rot is not None
         return out  # partial only at this site
 
     # C2 and C3 must lie within +/-3 min of maximum for any eclipse on Earth.
     half = 180.0 / 86400.0
-    tt_c2 = _bisect(observer, _g_total, tt_max - half, tt_max)
-    tt_c3 = _bisect(observer, _g_total, tt_max, tt_max + half)
+    try:
+        tt_c2 = _bisect(observer, gt, tt_max - half, tt_max)
+        tt_c3 = _bisect(observer, gt, tt_max, tt_max + half)
+    except ValueError:
+        # Con el limbo real, justo en el filo puede haber totalidad en el máximo y no
+        # llegar a haber contacto limpio: son las perlas de Baily, no una totalidad.
+        out['limb'] = rot is not None
+        return out
     dur = (tt_c3 - tt_c2) * 86400.0
 
     a2g, a2r, az2, t2 = altaz(tt_c2)
