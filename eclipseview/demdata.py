@@ -1,10 +1,12 @@
-"""Build a max-pooled DEM mosaic over the eclipse band from SRTM .hgt.gz tiles.
+"""Construye un mosaico de elevación agrupado por máximo sobre la franja del eclipse, a
+partir de teselas SRTM .hgt.gz.
 
-Max-pooling (not averaging) is deliberate: we are asking "can any terrain along this
-bearing block the Sun", so the highest point in each cell is the conservative answer.
-Averaging would smooth ridge crests away and make sites look better than they are.
+Agrupar por máximo (y no promediar) es deliberado: la pregunta es «¿puede taparme el
+Sol algo del terreno en este rumbo?», así que el punto más alto de cada celda es la
+respuesta conservadora. Promediar alisaría las crestas y haría que los sitios
+parecieran mejores de lo que son.
 
-Output: mosaic.npy (int16) + mosaic.json with the georeferencing.
+Salida: mosaic.npy (int16) + mosaic.json con la georreferenciación.
 """
 import gzip, json, os
 import numpy as np
@@ -27,7 +29,9 @@ def tile_name(lat, lon):
 
 
 def load_tile(lat, lon):
-    """Return a 600x600 max-pooled int16 array for the 1x1 degree tile, or None."""
+    """Devuelve un array int16 de 600x600 agrupado por máximo para la tesela de 1x1 grado, o
+    None.
+    """
     path = os.path.join(DEM_DIR, tile_name(lat, lon))
     if not os.path.exists(path):
         return None
@@ -38,7 +42,7 @@ def load_tile(lat, lon):
         return None
     a = raw.reshape(3601, 3601).astype(np.int16)
     a = np.where(a < -1000, 0, a)          # SRTM voids -> sea level
-    a = a[:3600, :3600]                    # drop the row/col shared with neighbours
+    a = a[:3600, :3600]                    # fuera la fila/columna que comparte vecino
     return a.reshape(PER_DEG, POOL, PER_DEG, POOL).max(axis=(1, 3)).astype(np.int16)
 
 
@@ -51,7 +55,7 @@ def main():
             if t is None:
                 continue
             found += 1
-            # row 0 of the mosaic is the northern edge (lat = LAT_N)
+            # la fila 0 del mosaico es el borde norte (lat = LAT_N)
             r0 = (LAT_N - (lat + 1)) * PER_DEG
             c0 = (lon - LON_W) * PER_DEG
             mosaic[r0:r0 + PER_DEG, c0:c0 + PER_DEG] = t
@@ -63,7 +67,7 @@ def main():
     print(f'tiles used: {found}')
     print(f'mosaic {mosaic.shape} int16 = {mosaic.nbytes/1e6:.0f} MB')
     print(f'elev range {mosaic.min()} .. {mosaic.max()} m')
-    # sanity: highest point in the box should be in the Pyrenees (Aneto 3404 m)
+    # cordura: el punto más alto de la caja tiene que caer en el Pirineo (Aneto 3404 m)
     r, c = np.unravel_index(np.argmax(mosaic), mosaic.shape)
     print(f'highest cell at lat {LAT_N - r/PER_DEG:.3f}, lon {LON_W + c/PER_DEG:.3f} '
           f'= {mosaic[r, c]} m')

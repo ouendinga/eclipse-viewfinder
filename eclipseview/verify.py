@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Verification suite: compare this engine against published values and analytic truth.
+"""Batería de verificación: contrasta este motor con valores publicados y con verdad
+analítica.
 
-The same function feeds both the test suite and the "how do I know this is right"
-section of the report, so the numbers shown to a reader are the numbers that were
-actually just computed -- never transcribed by hand.
+La misma función alimenta los tests y la sección «cómo sé que esto está bien» del
+informe, así que los números que ve un lector son los que se acaban de calcular, nunca
+transcritos a mano.
 """
 import numpy as np
 
@@ -38,8 +39,10 @@ def _secs(hms):
 
 
 def check_cities():
-    """IGN city circumstances. Sun altitude is the tight check; duration is loose
-    because the published figure depends where in the municipality you stand."""
+    """Circunstancias de ciudades del IGN. La comprobación estricta es la altura del Sol; la
+    duración va holgada porque la cifra publicada depende de en qué punto del municipio te
+    pongas.
+    """
     out = []
     for city in sources.REFERENCE_CITIES:
         c = circumstances(city['lat'], city['lon'], city['elev'])
@@ -82,7 +85,7 @@ def check_edge():
 
 
 def check_partial():
-    """Places that must NOT be inside the umbra."""
+    """Sitios que NO pueden estar dentro de la umbra."""
     out = []
     for p in sources.REFERENCE_PARTIAL:
         c = circumstances(p['lat'], p['lon'], p['elev'])
@@ -97,10 +100,11 @@ def check_partial():
 
 
 def check_sea_horizon():
-    """Looking out over open ocean, the skyline must equal the analytic dip.
+    """Mirando al océano abierto, la silueta tiene que dar exactamente la depresión
+    analítica.
 
-    This exercises curvature, refraction and the near-field DEM handling at once:
-    there is no terrain to hide behind, so any error shows up directly.
+    Ejercita a la vez la curvatura, la refracción y el manejo del campo cercano: no hay
+    terreno tras el que esconderse, así que cualquier error sale a la cara.
     """
     lat, lon, az = 43.1585, -9.2124, 275.0       # Cabo Vilán -> open Atlantic
     e = float(elev_fine(lat, lon)[0])
@@ -116,8 +120,9 @@ def check_sea_horizon():
 
 
 def check_known_summit():
-    """From Zaragoza the skyline in the WNW is the Moncayo. Compare against the
-    hand calculation h = (H - h0 - d^2(1-k)/2R) / d for the real summit."""
+    """Desde Zaragoza la silueta hacia el ONO es el Moncayo. Se compara con el cálculo a
+    mano h = (H - h0 - d²(1-k)/2R) / d para la cumbre real.
+    """
     lat, lon, elev = 41.6488, -0.8891, 228.0
     azs = np.arange(276.0, 286.01, 0.5)
     hz, bd, _ = horizon_fine(lat, lon, azs, obs_elev=elev, return_distance=True)
@@ -139,7 +144,7 @@ def check_known_summit():
 
 
 def check_path_width():
-    """Perpendicular umbral width over Spain, from the bisected limits."""
+    """Anchura umbral perpendicular sobre España, a partir de los límites bisecados."""
     from .analysis import path_limits
     lim = path_limits()
     if lim is None:
@@ -155,7 +160,9 @@ def check_path_width():
 
 
 def run_all(include_width=True):
-    """Every check. Returns a list of groups; each item carries ours/published/ok."""
+    """Todas las comprobaciones. Devuelve una lista de grupos; cada elemento lleva el valor
+    nuestro, el publicado y si pasa.
+    """
     groups = [check_greatest_eclipse()]
     groups += check_cities()
     groups += check_edge()

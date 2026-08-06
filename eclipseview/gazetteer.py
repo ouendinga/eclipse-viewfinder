@@ -1,18 +1,19 @@
 # -*- coding: utf-8 -*-
-"""Resolving a place name to coordinates, from a source we can stand behind.
+"""Resolver un nombre de sitio a coordenadas, desde una fuente que se pueda defender.
 
-Rule for this project: **the user never types free text that becomes a coordinate.**
-They pick from a list of real, identified settlements. Every candidate carries the
-identifiers needed to trace it back (OSM type + id), its administrative hierarchy and
-its population where known, so a result can always be audited later.
+Regla del proyecto: **el usuario nunca escribe texto libre que acabe siendo una
+coordenada.** Elige de una lista de poblaciones reales e identificadas. Cada candidato
+lleva los identificadores para poder rastrearlo (tipo + id de OSM), su jerarquía
+administrativa y su población cuando se sabe, así que un resultado siempre se puede
+auditar después.
 
-Source: Nominatim / OpenStreetMap. Chosen because it is open, worldwide, needs no key
-and returns stable object ids. Results are filtered to settlements
-(`class=place`, `type in SETTLEMENT_TYPES`) plus administrative boundaries that carry
-a place rank -- so "Malgrat de Mar" resolves, and "a nice hill I like" does not.
+Fuente: Nominatim / OpenStreetMap. Elegida por ser abierta, mundial, no pedir clave y
+devolver identificadores estables. Los resultados se filtran a poblaciones
+(`class=place`, `type in SETTLEMENT_TYPES`) más los límites administrativos que llevan
+rango de lugar: así «Malgrat de Mar» resuelve y «un cerro majo que me gusta» no.
 
-Nominatim's usage policy: max 1 request/second, a real User-Agent, and cache results.
-All three are honoured here.
+La política de uso de Nominatim pide como mucho 1 petición por segundo, un User-Agent
+de verdad y cachear los resultados. Las tres se cumplen aquí.
 """
 import json
 import os
@@ -79,8 +80,10 @@ def _get(path, params):
 
 
 def _shape(raw):
-    """Turn a Nominatim record into our candidate shape, or None if not a place."""
-    # jsonv2 calls it "category"; the older format calls it "class".
+    """Convierte un registro de Nominatim en nuestra forma de candidato, o None si no es un
+    lugar.
+    """
+    # jsonv2 lo llama «category»; el formato antiguo lo llama «class».
     cls = raw.get('class') or raw.get('category')
     typ = raw.get('type')
     atype = raw.get('addresstype')
@@ -90,7 +93,7 @@ def _shape(raw):
     elif cls == 'natural' and typ in FEATURE_TYPES:
         kind = 'feature'
     elif typ == 'administrative' and atype in SETTLEMENT_TYPES:
-        # an administrative boundary whose address type is a settlement
+        # un límite administrativo cuyo tipo de dirección es una población
         kind = 'settlement'
     elif cls is None and atype in SETTLEMENT_TYPES:
         kind = 'settlement'
@@ -126,11 +129,12 @@ def _shape(raw):
 
 
 def search(query, lang='es', limit=8, country_codes=None, use_cache=True):
-    """Candidate places for a query. Returns a LIST -- the caller must make the user
-    choose. Never silently takes the first hit for an ambiguous name.
+    """Lugares candidatos para una consulta. Devuelve una LISTA: quien llame tiene que hacer
+    que elija el usuario. Nunca se queda con el primero en silencio si el nombre es
+    ambiguo.
 
-    Raises LookupError when nothing matches, so a caller cannot mistake "no result"
-    for "somewhere at 0,0".
+    Lanza LookupError cuando no encaja nada, para que nadie pueda confundir «sin
+    resultados» con «algo que hay en 0,0».
     """
     if not query or not query.strip():
         raise ValueError('Consulta vacía')
@@ -165,10 +169,10 @@ def search(query, lang='es', limit=8, country_codes=None, use_cache=True):
 
 
 def describe(c, short=False):
-    """One-line label for a candidate.
+    """Etiqueta de una línea para un candidato.
 
-    `short` drops the population, for headlines: "Soria, Castilla y Leon" reads as a
-    title, "Soria, Castilla y Leon - 40.941 hab." does not.
+    `short` quita la población, para los titulares: «Soria, Castilla y León» se lee como
+    un título; «Soria, Castilla y León - 40.941 hab.» no.
     """
     bits = [c['name']] + c['admin'][:1 if short else 2]
     if c.get('country') and c.get('country_code') != 'ES':

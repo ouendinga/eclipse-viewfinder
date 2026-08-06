@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
-"""Translations for the place report.
+"""Traducciones del informe de lugar.
 
-Kept as plain dicts rather than gettext so the repo stays dependency-free and a
-translator can see every string at once. Missing keys fall back to Spanish and are
-reported by `check()`, so a half-translated locale is visible instead of silent.
+Van como diccionarios normales y no con gettext para que el repo no arrastre
+dependencias y para que quien traduzca vea todas las cadenas de golpe. Las claves que
+falten caen al español y `check()` las saca, así que un idioma a medio traducir se ve
+en vez de pasar en silencio.
 
-The Spain overview report is Spanish-only by design: it is an essay about one
-country's terrain, not a template. The *place* report is the one that generalises.
+El informe general de España es sólo en español a propósito: es un ensayo sobre el
+terreno de un país, no una plantilla. El que generaliza es el informe de *lugar*.
 """
 DEFAULT = 'es'
 
@@ -153,11 +154,12 @@ def deg(lang, value, decimals=2, sign=False):
 
 
 def obscuration(lang, pct, total):
-    """Format an obscuration percentage without ever lying by rounding.
+    """Formatea un porcentaje de obscuración sin mentir por redondeo.
 
-    A partial eclipse of 99.994% must not print as "100.0% partial": that reads as a
-    contradiction and undermines every other number on the page. Add decimals until
-    the value stays below 100, and fall back to an explicit ">" if it never does.
+    Un parcial del 99,994 % no puede salir como «100,0% parcial»: se lee como una
+    contradicción y se lleva por delante la credibilidad del resto de números de la
+    página. Se añaden decimales hasta que el valor se queda por debajo de 100, y si nunca
+    lo consigue se cae a un «>» explícito.
     """
     if total:
         return '100%'
@@ -169,6 +171,6 @@ def obscuration(lang, pct, total):
 
 
 def check(lang):
-    """Keys missing from a locale, so an incomplete translation is visible."""
+    """Las claves que le faltan a un idioma, para que una traducción incompleta se vea."""
     base = set(STRINGS[DEFAULT])
     return sorted(base - set(STRINGS.get(lang, {})))

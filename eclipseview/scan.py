@@ -1,10 +1,11 @@
-"""Scan the whole Spanish totality band for viewpoints whose WNW skyline is low
-enough that the eclipsed Sun stays clear of the terrain for the WHOLE of totality.
+"""Barre la franja de totalidad española buscando miradores cuya silueta al ONO sea lo
+bastante baja como para que el Sol eclipsado no toque el terreno durante TODA la
+totalidad.
 
-Metric: clearance = (apparent Sun altitude) - (apparent terrain horizon altitude),
-evaluated at C2, mid-totality and C3, in each case at that instant's own azimuth.
-The score is the MINIMUM of the three: the Sun must be clear the entire time, and it
-is sinking while the eclipse runs, so C3 is usually the binding constraint.
+La métrica: margen = (altura aparente del Sol) - (altura aparente del horizonte),
+evaluado en C2, a mitad de totalidad y en C3, cada uno con su propio azimut. La
+puntuación es el MÍNIMO de los tres: el Sol tiene que estar libre todo el rato, y va
+bajando mientras dura el eclipse, así que el que suele mandar es C3.
 """
 import os, pickle
 import numpy as np
@@ -19,22 +20,23 @@ STRIDE = 6            # mosaic cells -> ~1.1 km grid
 MIN_DUR = 60.0        # s of totality demanded
 CHUNK = 40000
 
-# Ranking pass: sampling to 150 km. Terrain beyond that would have to exceed ~3 km
-# to intrude above 1 deg, which does not occur west of the band.
+# Pasada de ranking: se muestrea hasta 150 km. Para asomar por encima de 1° desde más
+# lejos, el terreno tendría que pasar de ~3 km, y eso no ocurre al oeste de la banda.
 DISTS = np.concatenate([np.arange(400.0, 25000.0, 180.0),
                         np.arange(25000.0, 150000.0, 800.0)])
 
 
 def main(min_dur=MIN_DUR, min_mag=None, out_path=None, stride=STRIDE):
-    """Sweep the region and compute clearance for every land point that passes.
+    """Recorre la región y calcula el margen de cada punto de tierra que pase el filtro.
 
-    `min_mag` selects by eclipse magnitude instead of by seconds of totality, which is
-    how we reach the deep-partial ground outside the path: from a town 100 km north of
-    the shadow the honest recommendation is still a viewpoint, not an empty result.
+    `min_mag` selecciona por magnitud del eclipse en vez de por segundos de totalidad, que
+    es como se llega al terreno de parcial profundo fuera de la franja: desde un pueblo a
+    100 km al norte de la sombra, la recomendación honrada sigue siendo un mirador y no
+    una lista vacía.
     """
     f = field.load()
 
-    # Candidate grid over the mosaic
+    # Rejilla de candidatos sobre el mosaico
     rows = np.arange(0, 3600, stride)
     cols = np.arange(0, 8400, stride)
     lat_g = LAT_N - rows / PER_DEG

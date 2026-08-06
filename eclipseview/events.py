@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
-"""Eclipse events.
+"""Los eventos de eclipse.
 
-The engine is written against an Event, never against a hard-coded date, so adding
-another eclipse is a config entry rather than a rewrite. Today only one event is
-wired up end to end; the rest of the pipeline already takes `event` as a parameter.
+El motor está escrito contra un Event y nunca contra una fecha metida a fuego, así que
+añadir otro eclipse es una entrada de configuración y no una reescritura. Hoy sólo hay
+uno cableado de punta a punta; el resto de la cadena ya recibe `event` como parámetro.
 
-`search_start_utc` / `search_end_utc` bracket the local circumstances hunt. They must
-contain the eclipse everywhere in the region you intend to serve, and be tight enough
-that the coarse scan is cheap. For a given eclipse, greatest-eclipse time +/- 90 min
-covers the whole path.
+`search_start_utc` / `search_end_utc` acotan la búsqueda de circunstancias locales.
+Tienen que contener el eclipse en toda la región que se quiera servir, y ser lo
+bastante estrechos como para que el barrido grueso salga barato. Para un eclipse dado,
+la hora del máximo ±90 min cubre la franja entera.
 """
 from dataclasses import dataclass, field as _field
 
@@ -23,7 +23,7 @@ class Event:
     search_end_utc: tuple
     tz_offset_h: float          # local clock offset used in reports
     tz_label: str
-    # Region this event's precomputed data covers: (lat_s, lat_n, lon_w, lon_e)
+    # Región que cubren los datos precalculados: (lat_s, lat_n, lon_w, lon_e)
     region: tuple
     notes: str = ''
     extra: dict = _field(default_factory=dict)
@@ -45,8 +45,8 @@ TSE_2026 = Event(
     notes='Franja de totalidad sobre el norte de España, con el Sol muy bajo.',
 )
 
-# Declared but NOT yet wired end to end: no precomputed field or DEM ships for these.
-# Kept here so the shape of "add an eclipse" is obvious.
+# Declarados pero SIN cablear de punta a punta: no se publica campo precalculado ni
+# DEM para estos. Están aquí para que se vea la forma que tiene «añadir un eclipse».
 TSE_2027 = Event(
     key='tse2027', date=(2027, 8, 2),
     label='Eclipse total de Sol del 2 de agosto de 2027',
@@ -66,7 +66,7 @@ ASE_2028 = Event(
 )
 
 EVENTS = {e.key: e for e in (TSE_2026, TSE_2027, ASE_2028)}
-READY = {'tse2026'}          # events with precomputed data in this repo
+READY = {'tse2026'}          # eventos con datos precalculados en este repo
 DEFAULT = TSE_2026
 
 

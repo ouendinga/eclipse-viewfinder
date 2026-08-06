@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
-"""Sites featured in the overview report.
+"""Los sitios que salen en el informe general.
 
-Only coordinates and *qualitative* editorial text live here. Every number in the
-report is computed at render time from these coordinates -- so the roster can never
-drift out of sync with the figures shown next to it.
+Aquí sólo viven coordenadas y texto editorial *cualitativo*. Cada número del informe
+se calcula al pintarlo a partir de estas coordenadas, así que la lista no puede
+desincronizarse de las cifras que salen a su lado.
 
-The coordinates were chosen by the pipeline itself (scan -> robustness -> refine),
-not picked off a map: each is the best spot found inside its zone.
+Las coordenadas las eligió la propia cadena de proceso (barrido -> robustez ->
+refinado) y no un dedo sobre el mapa: cada una es el mejor sitio encontrado en su
+zona.
 """
 
 TIERS = [
@@ -94,8 +95,9 @@ SITES = [
               'miras por encima de todo hacia el mar.'),
 ]
 
-# Sites shown in the "what does each hour of driving buy" ladder, nearest first.
+# Los sitios de la escalera «qué te da cada hora de coche», del más cercano al más
+# lejano.
 LADDER = ['tarragona', 'delta', 'ebro', 'soria_n', 'palencia', 'busto']
 
-# Reference origin for the distance column of the overview.
+# Origen de referencia para la columna de distancias del informe general.
 LADDER_ORIGIN = dict(name='Barcelona', lat=41.3874, lon=2.1686)

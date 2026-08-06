@@ -1,9 +1,10 @@
-"""Local robustness scan: is a good horizon a property of the AREA or one lucky pixel?
+"""Barrido de robustez local: ¿un buen horizonte es propiedad del ÁREA o de un píxel con
+suerte?
 
-For each zone we evaluate clearance on a fine grid at full 1-arcsec resolution and
-report the distribution, plus the best specific spot. A site is only worth recommending
-if a decent fraction of its neighbourhood also works -- otherwise the recommendation is
-an artefact of where exactly the DEM sample fell.
+De cada zona se evalúa el margen en una rejilla fina a resolución entera y se informa
+del reparto, más el mejor sitio concreto. Un sitio sólo merece recomendarse si una
+parte decente de su alrededor también funciona; si no, la recomendación es un artefacto
+de dónde cayó exactamente la muestra del modelo de elevación.
 """
 import json, os, sys
 import numpy as np
@@ -27,7 +28,7 @@ ZONES = [
     ('Mallorca NW coast (Tramuntana)',     39.700,  2.560, 9.0),
 ]
 
-N = 13          # grid is N x N
+N = 13          # la rejilla es de N x N
 
 
 def zone(name, clat, clon, half_km):

@@ -1,4 +1,4 @@
-"""Shared stylesheet for the eclipse reports."""
+"""La hoja de estilos que comparten los informes del eclipse."""
 
 CSS = """
 :root{

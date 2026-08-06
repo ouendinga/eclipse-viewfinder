@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
-"""Static site generator: precomputed reports plus an index to pick from.
+"""Generador del sitio estático: informes precalculados más un índice donde elegir.
 
-Why static: a live query needs ~700 MB of elevation tiles on disk and tens of seconds
-of CPU, which no serverless platform will give you. So the site ships the answers for
-a curated list of places, computed ahead of time, and is honest in the interface about
-what is precomputed and what still needs the command line.
+Por qué estático: una consulta en vivo necesita ~700 MB de teselas de elevación en
+disco y decenas de segundos de CPU, y eso no lo da ninguna plataforma sin servidor.
+Así que el sitio publica las respuestas de una lista curada de sitios, calculadas de
+antemano, y es honrado en la interfaz sobre qué está precalculado y qué sigue
+necesitando la línea de comandos.
 
-This is also the shape the eventual backend wants: precompute the likely places, fall
-back to live computation only for the rest.
+Es además la forma que quiere el backend del futuro: precalcular los sitios probables
+y dejar el cálculo en vivo sólo para el resto.
 """
 import json
 import os

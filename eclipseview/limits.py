@@ -56,7 +56,7 @@ def main():
     n = np.array([r['north'] for r in res])
     s = np.array([r['south'] for r in res])
     c = np.array([r['centre'] for r in res])
-    # perpendicular width = N-S chord * cos(angle of the path from the E-W direction)
+    # anchura perpendicular = cuerda N-S * cos(ángulo de la franja respecto al E-O)
     dlat = np.gradient(c) * 111.2
     dlon = np.gradient(lon) * 111.32 * np.cos(np.radians(c))
     theta = np.arctan2(dlat, dlon)

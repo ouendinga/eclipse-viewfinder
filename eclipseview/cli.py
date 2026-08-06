@@ -87,9 +87,9 @@ def cmd_place(a):
     if gaps:
         sys.exit('Faltan datos base: ' + ', '.join(gaps) + '. Ejecuta: eclipseview setup')
 
-    # Resolve and check coverage BEFORE opening the progress bar. Both are quick, and
-    # sizing the bar needs their answers -- a bar whose total changes mid-run is
-    # exactly the fake progress this project is trying not to ship.
+    # Resolver y comprobar la cobertura ANTES de abrir la barra de progreso. Las dos
+    # cosas son rápidas y dimensionar la barra necesita sus respuestas: una barra cuyo
+    # total cambia a mitad es justo el progreso falso que este proyecto no quiere.
     if not a.quiet:
         print('Localizando el sitio...', file=sys.stderr)
     origin = (_pick(a.query, a.lang, a.country, a.pick, interactive=not a.no_input)
@@ -146,7 +146,7 @@ def cmd_place(a):
         job.step(i, len(manual) + a.top, f'{lat:.3f},{lon:.3f}')
         r = evaluate(lat, lon)
         if r['clear'] < a.min_clear:
-            continue          # the 185 m pass can be wrong on steep ground
+            continue          # la pasada de 185 m falla en terreno con pendiente
         rows.append(r)
         kept += 1
 

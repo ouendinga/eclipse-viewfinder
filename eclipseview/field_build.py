@@ -1,8 +1,10 @@
-"""Parallel build of the eclipse geometry field (one worker per latitude row).
+"""Construcción en paralelo del campo de geometría del eclipse, un trabajador por fila de
+latitud.
 
-Uses the 'spawn' start method on purpose: the JPL ephemeris is lazily memory-mapped,
-and a forked child inherits that half-initialised mmap, which blows up inside jplephem
-("cannot reshape array of size ..."). Spawned children import and map it themselves.
+Usa el método de arranque 'spawn' a propósito: las efemérides del JPL van mapeadas en
+memoria de forma perezosa, y un hijo por `fork` hereda ese mapeo a medio hacer, que
+revienta dentro de jplephem («cannot reshape array of size ...»). Los hijos lanzados
+con spawn se lo importan y lo mapean ellos.
 """
 import multiprocessing as mp
 import os, pickle

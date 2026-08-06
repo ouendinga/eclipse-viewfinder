@@ -1,8 +1,8 @@
-"""Where the data lives.
+"""Dónde viven los datos.
 
-Everything derived (DEM tiles, mosaic, eclipse field, reports) goes under a single
-data directory so the repository itself stays small and reproducible. Override with
-the EV_DATA environment variable.
+Todo lo derivado (teselas del DEM, mosaico, campo del eclipse, informes) cuelga de un
+único directorio de datos para que el repositorio se quede pequeño y reproducible. Se
+puede cambiar con la variable de entorno EV_DATA.
 """
 import os
 
@@ -21,7 +21,7 @@ MAP_SVG = os.path.join(DATA_DIR, 'map.svg')
 SCAN_PKL = os.path.join(DATA_DIR, 'scan.pkl')
 ZONES_JSON = os.path.join(DATA_DIR, 'zones.json')
 
-# Skyfield keeps the JPL ephemeris here
+# Skyfield guarda aquí las efemérides del JPL
 EPHEM_DIR = DATA_DIR
 
 
@@ -31,7 +31,7 @@ def ensure():
 
 
 def missing():
-    """Which prerequisites are absent, so the CLI can tell the user what to run."""
+    """Qué requisitos faltan, para que el CLI pueda decirle a quien lo usa qué ejecutar."""
     out = []
     if not os.path.isdir(DEM_DIR) or not os.listdir(DEM_DIR):
         out.append('teselas DEM')

@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
-"""Staged progress reporting, so a caller can show a loading state that is true.
+"""Progreso por fases, para que quien llame pueda enseñar una espera que sea verdad.
 
-The point is that the percentage means something. Stage weights are derived from the
-work actually queued -- how many tiles must be downloaded, how many sites will be
-re-checked at 30 m -- rather than from a fixed script. A request that needs no new
-elevation data skips that stage entirely and says so, instead of animating a fake bar.
+La gracia es que el porcentaje signifique algo. El peso de cada fase sale del trabajo
+que de verdad está encolado —cuántas teselas hay que bajar, cuántos sitios se van a
+recomprobar a 30 m— y no de un guion fijo. Una consulta que no necesita elevación
+nueva se salta esa fase entera y lo dice, en vez de animar una barra falsa.
 
-Emits newline-delimited JSON when `stream` is set, which is what an HTTP endpoint or
-a CLI spinner can consume directly.
+Con `stream` puesto emite JSON por líneas, que es lo que un endpoint HTTP o un
+indicador de la consola pueden consumir directamente.
 """
 import json
 import os
@@ -16,7 +16,8 @@ import time
 
 from .paths import DATA_DIR
 
-# Measured on a 16-core laptop; used only to turn queued work into weights, never
+# Medido en un portátil de 16 núcleos; sólo sirve para convertir trabajo encolado en
+# pesos, nunca
 # presented as a promise.
 COST = {
     'resolve': 1.5,          # gazetteer lookup (throttled to 1 req/s)
@@ -32,7 +33,7 @@ COST = {
 
 
 class Job:
-    """A unit of work with weighted stages and honest progress."""
+    """Una unidad de trabajo con fases pesadas y progreso honrado."""
 
     def __init__(self, name, plan, on_event=None, stream=None, state_path=None):
         """`plan` maps stage key -> weight (seconds of expected work)."""
@@ -69,12 +70,12 @@ class Job:
         return ev
 
     def eta(self):
-        """Seconds remaining.
+        """Segundos que quedan.
 
-        Stage weights are already calibrated in seconds, so the remaining weight IS a
-        first estimate -- available immediately, unlike a throughput figure, which is
-        meaningless until a decent share of the work is done. Once past 20 % we
-        rescale by what this machine is actually achieving.
+        El peso de las fases ya está calibrado en segundos, así que el peso restante ES una
+        primera estimación, disponible desde el principio. Un dato de rendimiento no sirve
+        hasta que se ha hecho una parte decente del trabajo. Pasado el 20 % se reescala con
+        lo que esta máquina está consiguiendo de verdad.
         """
         remaining = max(0.0, self.total - self.done)
         if self.done > 0.2 * self.total:
@@ -86,7 +87,7 @@ class Job:
 
     # ---------------------------------------------------------------- stages
     def stage(self, key, message):
-        """Begin a stage. Closing the previous one credits its full weight."""
+        """Empieza una fase. Cerrar la anterior le abona su peso entero."""
         if self.current is not None:
             self.done += self.plan.get(self.current, 0.0) - self._credited
         self.current = key
@@ -95,7 +96,7 @@ class Job:
         return self._emit('stage', message=message, eta=self.eta())
 
     def step(self, done, total, message=None):
-        """Partial progress inside the current stage."""
+        """Progreso parcial dentro de la fase actual."""
         w = self.plan.get(self.current, 0.0)
         want = w * (done / total if total else 1.0)
         self.done += want - self._credited
@@ -118,7 +119,7 @@ class Job:
 
 
 def plan_for_place(missing_tiles, n_sites, needs_mosaic):
-    """Weights for a "best viewpoints near X" request, from the queued work."""
+    """Pesos de una consulta «mejores miradores cerca de X», sacados del trabajo encolado."""
     plan = {'resolve': COST['resolve'], 'coverage': COST['coverage']}
     if missing_tiles:
         plan['download'] = COST['download_per_tile'] * missing_tiles
@@ -132,7 +133,7 @@ def plan_for_place(missing_tiles, n_sites, needs_mosaic):
 
 
 def cli_reporter(verbose=True):
-    """A callback that prints a readable one-line progress bar to stderr."""
+    """Un callback que pinta en stderr una barra de progreso de una línea."""
     def report(ev):
         if not verbose:
             return

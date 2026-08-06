@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
-"""The in-page finder: locality + radius over the precomputed recommendation points.
+"""El buscador de la propia página: localidad + radio sobre los miradores precalculados.
 
-No backend. The whole search is a distance filter over `points.json`, and the
-panoramas are drawn in the browser from a compact horizon profile rather than shipped
-as one SVG per point.
+Sin servidor. La búsqueda entera es un filtro por distancia sobre `points.json`, y los
+panoramas se dibujan en el navegador desde un perfil de horizonte compacto en vez de
+mandar un SVG por punto.
 
-Two rules carried over from the command line:
-  * the locality is chosen from a list of real places (Nominatim), never free text
-    turned into a coordinate;
-  * the radius is capped, because "10000 km" would return the whole country and mean
-    nothing.
+Dos reglas que vienen de la línea de comandos:
+  * la localidad se elige de una lista de sitios reales (Nominatim), nunca es texto
+    libre convertido en coordenada;
+  * el radio tiene tope, porque «10.000 km» devolvería el país entero y no
+    significaría nada.
 """
 
 MAX_RADIUS_KM = 100

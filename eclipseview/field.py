@@ -1,6 +1,7 @@
-"""Compute the eclipse geometry field over Iberia on a coarse grid, then expose
-fast bilinear interpolators. The geometry varies smoothly over tens of km, so a
-0.25 deg grid interpolates to well under 0.01 deg of Sun altitude.
+"""Calcula el campo de geometría del eclipse sobre la Península en una rejilla gruesa y
+expone luego interpoladores bilineales rápidos. La geometría varía suavemente en
+decenas de km, así que una rejilla de 0,25° interpola con un error muy por debajo de
+0,01° de altura del Sol.
 """
 import os, pickle
 import numpy as np
@@ -69,7 +70,8 @@ if __name__ == '__main__':
     print(f"\nmax totality anywhere in box: {dur.max():.1f}s")
     i, j = np.unravel_index(np.argmax(dur), dur.shape)
     print(f"  at lat {LATS[i]:.2f} lon {LONS[j]:.2f}")
-    # Where does the centreline cross? For each longitude, the latitude of max duration.
+    # ¿Por dónde pasa la línea central? Para cada longitud, la latitud de duración
+    # máxima.
     print("\ncentreline (latitude of longest totality per longitude):")
     for j, lo in enumerate(LONS):
         col = dur[:, j]

@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
-"""Which elevation data a request needs, what we already have, and fetching the rest.
+"""Qué datos de elevación necesita una consulta, cuáles hay ya, y cómo bajar el resto.
 
-The subtlety that makes this non-trivial: analysing a viewpoint does **not** only need
-elevation under the viewpoint. Rays are cast toward the Sun's azimuth out to
-`RAY_MAX_KM`, so a request centred on the coast still needs tiles far inland (or
-offshore) in the WNW. The needed set is therefore the search disc *swept* along the
-Sun's bearing, not the disc alone.
+El detalle que hace esto menos trivial de lo que parece: analizar un mirador NO
+necesita sólo la elevación bajo el mirador. Los rayos salen hacia el azimut del Sol
+hasta `RAY_MAX_KM`, así que una consulta centrada en la costa sigue necesitando
+teselas muy tierra adentro (o mar adentro) hacia el ONO. El conjunto necesario es el
+disco de búsqueda *barrido* a lo largo del rumbo del Sol, no el disco solo.
 
-Getting this wrong is silent and dangerous: missing tiles read as sea level, which
-would quietly turn a blocked horizon into a clear one.
+Equivocarse aquí es silencioso y peligroso: una tesela que falta se lee como nivel del
+mar, y eso convertiría un horizonte tapado en uno despejado sin que nadie se entere.
 """
 import gzip
 import os
@@ -20,9 +20,10 @@ import numpy as np
 from .paths import DEM_DIR
 from .terrain import R_EARTH, _offset
 
-# Ray sampling reaches 150 km; keep the tile margin consistent with it.
+# El muestreo de rayos llega a 150 km; el margen de teselas va acorde.
 RAY_MAX_KM = 150.0
-# The Sun sits in the WNW for this event; widen generously so the corridor is safe.
+# En este evento el Sol está al ONO; se ensancha con holgura para que el corredor
+# vaya sobrado.
 DEFAULT_AZ_RANGE = (255.0, 305.0)
 TILE_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/skadi/{ns}/{name}'
 TYPICAL_TILE_BYTES = 9_000_000       # observed average for 1x1 deg SRTM .hgt.gz
@@ -44,18 +45,19 @@ def tiles_covering(lat_min, lat_max, lon_min, lon_max):
 
 def required_tiles(lat, lon, radius_km, az_range=DEFAULT_AZ_RANGE,
                    ray_km=RAY_MAX_KM):
-    """Every 1x1 degree tile needed to analyse a disc of candidates.
+    """Todas las teselas de 1x1 grado que hacen falta para analizar un disco de candidatos.
 
-    = tiles under the disc, plus tiles under the corridor swept from the disc edge
-    along the Sun's azimuth range out to `ray_km`.
+    = las teselas bajo el disco, más las que caen bajo el corredor barrido desde el borde
+    del disco a lo largo del rango de azimutes del Sol hasta `ray_km`.
     """
     need = set()
-    # the search disc itself
+    # el disco de búsqueda en sí
     dlat = radius_km / 111.2
     dlon = radius_km / (111.32 * max(np.cos(np.radians(lat)), 0.05))
     need |= tiles_covering(lat - dlat, lat + dlat, lon - dlon, lon + dlon)
 
-    # the ray corridor: sample the disc boundary and the centre, project outward
+    # el corredor de rayos: se muestrea el borde del disco y el centro, y se proyecta
+    # hacia fuera
     az0, az1 = az_range
     azs = np.linspace(az0, az1, 9)
     origins = [(lat, lon)]
@@ -73,7 +75,7 @@ def required_tiles(lat, lon, radius_km, az_range=DEFAULT_AZ_RANGE,
 
 
 def status(tiles):
-    """Split a tile set into what we have and what we are missing."""
+    """Parte un conjunto de teselas en las que hay y las que faltan."""
     have, missing = [], []
     for t in sorted(tiles):
         p = os.path.join(DEM_DIR, tile_name(*t))
@@ -88,10 +90,10 @@ def estimate(missing):
 
 
 def fetch(missing, progress=None, timeout=120):
-    """Download the missing tiles. Ocean-only tiles legitimately 404: they are
-    recorded as 'sea' so we never retry them and never mistake them for a gap.
+    """Baja las teselas que faltan. Las que son sólo océano dan 404 con toda la razón: se
+    apuntan como 'sea' para no reintentarlas nunca ni confundirlas con un hueco.
 
-    Returns (downloaded, sea, failed).
+    Devuelve (bajadas, mar, fallidas).
     """
     os.makedirs(DEM_DIR, exist_ok=True)
     downloaded, sea, failed = [], [], []
@@ -110,7 +112,8 @@ def fetch(missing, progress=None, timeout=120):
             tmp = dest + '.part'
             with open(tmp, 'wb') as f:
                 f.write(data)
-            # verify it really is a readable 3601x3601 int16 grid before accepting
+            # comprobar que de verdad es una rejilla int16 de 3601x3601 legible antes
+            # de darla por buena
             with gzip.open(tmp, 'rb') as f:
                 n = len(f.read())
             if n != 3601 * 3601 * 2:

@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-"""HTML reports. Every figure shown is computed at render time.
+"""Informes en HTML. Cada cifra que sale se calcula al pintarla.
 
-There is deliberately no number typed into the prose: the templates take values from
-the evaluated sites, from `verify.run_all()` and from `sources`, so the text and the
-tables cannot drift apart. External statistics (cloud climatology) are rendered with
-their attribution attached, never inline as if they were ours.
+No hay ni un número escrito a mano en la prosa, y es a propósito: las plantillas toman
+los valores de los sitios evaluados, de `verify.run_all()` y de `sources`, así que el
+texto y las tablas no pueden separarse. Las estadísticas externas (la climatología de
+nubes) se pintan con su atribución pegada, nunca metidas en línea como si fueran
+nuestras.
 """
 import html
 
@@ -36,7 +37,7 @@ def _td_class(clear):
 # --------------------------------------------------------------------- notes
 
 def site_note(row, lang, min_clear=1.5):
-    """Explain the verdict in words, from this row's own numbers."""
+    """Explica el veredicto con palabras, sacadas de los números de esa misma fila."""
     d = lambda v, s=False: i18n.deg(lang, v, 2, s)          # noqa: E731
     if row['clear'] < 0:
         note = i18n.t(lang, 'note_blocked',
@@ -66,7 +67,7 @@ def site_note(row, lang, min_clear=1.5):
 
 def render_place(origin, radius_km, rows, min_clear, lang='es', event=None,
                  verification=None):
-    """Report for "the best viewpoints within R km of X"."""
+    """Informe de «los mejores miradores a R km de X»."""
     from . import events
     ev = event or events.DEFAULT
     tz = ev.tz_label

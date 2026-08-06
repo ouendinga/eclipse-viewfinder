@@ -21,7 +21,7 @@ import numpy as np
 from .paths import DEM_DIR, MOSAIC_NPY, MOSAIC_JSON
 
 R_EARTH = 6371000.0
-K_REFR = 0.13            # standard terrestrial refraction coefficient
+K_REFR = 0.13            # coeficiente de refracción terrestre estándar
 NEAR_FAR_SPLIT = 25000.0  # m: por debajo, resolución entera; por encima, el mosaico
 
 _here = os.path.dirname(os.path.abspath(__file__))
@@ -85,7 +85,7 @@ def elev_at(lat, lon):
 # ---------------------------------------------------------------- fine (1 arcsec)
 
 def _tile(lat_i, lon_i):
-    """Full-resolution 3601x3601 tile, cached. Missing (all-ocean) -> None."""
+    """Tesela de 3601x3601 a resolución entera, cacheada. Si falta (todo océano) -> None."""
     key = (lat_i, lon_i)
     if key in _tiles:
         return _tiles[key]
@@ -106,7 +106,7 @@ def _tile(lat_i, lon_i):
 
 
 def elev_fine(lat, lon):
-    """Bilinearly interpolated 1-arcsec elevation (m). Sea / missing -> 0."""
+    """Elevación (m) a 1 segundo de arco, interpolada bilineal. Mar o ausente -> 0."""
     lat = np.atleast_1d(np.asarray(lat, dtype=np.float64))
     lon = np.atleast_1d(np.asarray(lon, dtype=np.float64))
     out = np.zeros(lat.shape, dtype=np.float64)
@@ -133,7 +133,9 @@ def elev_fine(lat, lon):
 # ---------------------------------------------------------------- geometry
 
 def _offset(lat, lon, az_deg, d_m):
-    """Great-circle offset. lat/lon degrees (arrays), az degrees, d metres."""
+    """Desplazamiento por círculo máximo. lat/lon en grados (arrays), az en grados, d en
+    metros.
+    """
     lat1 = np.radians(lat); lon1 = np.radians(lon); az = np.radians(az_deg)
     dr = d_m / R_EARTH
     sin_lat2 = np.sin(lat1) * np.cos(dr) + np.cos(lat1) * np.sin(dr) * np.cos(az)
@@ -242,7 +244,7 @@ def sea_horizon_dip(obs_elev, eye_h=1.6):
 
 if __name__ == '__main__':
     print('Independent checks (expected values derived by hand):\n')
-    # 1. Open ocean to the west -> must come out at the sea-horizon dip.
+    # 1. Océano abierto al oeste -> tiene que salir la depresión del horizonte marino.
     h, d, e = horizon_fine(43.1585, -9.2124, [275.0], return_distance=True)
     print(f'Cabo Vilan -> open Atlantic (az 275)      : {h[0]:+.3f} deg  '
           f'[sea dip at {e:.0f} m = {sea_horizon_dip(e):+.3f}]')
