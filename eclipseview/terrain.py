@@ -1,17 +1,20 @@
-"""Terrain horizon engine: apparent elevation angle of the skyline in a given bearing.
+"""El motor del horizonte: ángulo aparente de la silueta del terreno en un rumbo.
 
-For every viewpoint we cast rays outward and ask how high the terrain rises above the
-astronomical horizontal, including:
-  - Earth curvature drop:  d^2 / (2R) * (1 - k)
-  - standard terrestrial refraction, k = 0.13 (lifts distant terrain slightly)
-The result is directly comparable with the Sun's *apparent* (refracted) altitude.
+Desde cada mirador se lanzan rayos hacia fuera y se pregunta cuánto se levanta el
+terreno por encima de la horizontal astronómica, contando:
+  - la caída por curvatura terrestre:  d² / (2R) * (1 - k)
+  - la refracción terrestre estándar, k = 0,13, que levanta un poco el terreno lejano
+El resultado se puede comparar directamente con la altura *aparente* (refractada) del
+Sol.
 
-Two resolution regimes, deliberately separated:
-  * NEAR field  -- full 1-arcsec (~30 m) SRTM, bilinearly interpolated. Max-pooled data
-    must NOT be used here: the observer's own 185 m cell holds the highest point within
-    it, which fabricates a near wall metres from the viewer.
-  * FAR field   -- the 6-arcsec max-pooled mosaic, which conservatively preserves ridge
-    crests where what matters is whether *any* terrain along the bearing intrudes.
+Dos regímenes de resolución, separados a propósito:
+  * campo CERCANO -- SRTM de 1 segundo de arco (~30 m) entero, interpolado bilineal.
+    Aquí NO se puede usar el dato agrupado por máximo: la celda de 185 m del propio
+    observador guarda el punto más alto que haya dentro, y eso fabrica un muro a
+    metros de quien mira.
+  * campo LEJANO  -- el mosaico de 6 segundos agrupado por máximo, que conserva las
+    crestas del lado conservador, que es lo que importa cuando la pregunta es si
+    asoma *algo* de terreno en ese rumbo.
 """
 import gzip, json, os
 import numpy as np
@@ -19,7 +22,7 @@ from .paths import DEM_DIR, MOSAIC_NPY, MOSAIC_JSON
 
 R_EARTH = 6371000.0
 K_REFR = 0.13            # standard terrestrial refraction coefficient
-NEAR_FAR_SPLIT = 25000.0  # m: below this use full-res, above use the mosaic
+NEAR_FAR_SPLIT = 25000.0  # m: por debajo, resolución entera; por encima, el mosaico
 
 _here = os.path.dirname(os.path.abspath(__file__))
 
@@ -64,7 +67,7 @@ def dem():
 # ---------------------------------------------------------------- coarse (mosaic)
 
 def elev_at(lat, lon):
-    """Nearest-cell elevation (m) from the max-pooled mosaic. Sea / outside -> 0."""
+    """Altura (m) de la celda más cercana del mosaico. Mar o fuera del área -> 0."""
     m = meta()
     per_deg, lat_n, lon_w = m['per_deg'], m['lat_n'], m['lon_w']
     rows, cols = m['rows'], m['cols']
@@ -147,17 +150,18 @@ def _angle(h_target, h_obs, d):
 
 def coarse_distances(d_min=400.0, d_split=NEAR_FAR_SPLIT, step_near=180.0,
                      d_max=200000.0, step_far=500.0):
-    """Mosaic-resolution sampling. d_min defaults to >2 mosaic cells to avoid the
-    observer's own max-pooled cell being read as an obstruction."""
+    """Muestreo a resolución del mosaico. d_min vale por defecto más de 2 celdas para
+    que la celda agrupada del propio observador no se lea como un obstáculo."""
     return np.concatenate([np.arange(d_min, d_split, step_near),
                            np.arange(d_split, d_max, step_far)])
 
 
 def horizon_coarse(lat, lon, obs_elev, azimuths, dists=None, eye_h=1.6,
                    return_distance=False):
-    """Vectorised over viewpoints, mosaic resolution. Returns (n_az, n_pt) in degrees.
+    """Vectorizado sobre miradores, a resolución de mosaico. Devuelve (n_az, n_pt) en
+    grados.
 
-    Suitable for RANKING many candidate sites; refine winners with horizon_fine.
+    Sirve para ORDENAR muchos candidatos; los ganadores se afinan con horizon_fine.
     """
     lat = np.atleast_1d(np.asarray(lat, dtype=np.float64))
     lon = np.atleast_1d(np.asarray(lon, dtype=np.float64))
@@ -179,10 +183,10 @@ def horizon_coarse(lat, lon, obs_elev, azimuths, dists=None, eye_h=1.6,
 
 def horizon_per_point(lat, lon, obs_elev, az, dists, eye_h=1.6,
                       return_distance=False):
-    """Like horizon_coarse but each viewpoint has its OWN azimuth (same shape as lat).
+    """Como horizon_coarse pero cada mirador lleva SU azimut (misma forma que lat).
 
-    Needed because the Sun's azimuth at totality varies across the path
-    (about 279 deg in Galicia to 288 deg in the Balearics).
+    Hace falta porque el azimut del Sol durante la totalidad cambia a lo largo de la
+    franja: unos 279° en Galicia y 288° en Baleares.
     """
     lat = np.asarray(lat, dtype=np.float64)
     lon = np.asarray(lon, dtype=np.float64)
@@ -202,9 +206,10 @@ def horizon_per_point(lat, lon, obs_elev, az, dists, eye_h=1.6,
 def horizon_fine(lat, lon, azimuths, obs_elev=None, eye_h=1.6, d_min=60.0,
                  step_near=25.0, d_split=NEAR_FAR_SPLIT, step_far=400.0,
                  d_max=200000.0, return_distance=False):
-    """Single viewpoint, full 1-arcsec near field + mosaic far field.
+    """Un solo mirador: campo cercano a 1 segundo entero y campo lejano de mosaico.
 
-    obs_elev defaults to the interpolated full-res elevation of the viewpoint itself.
+    Si no se da obs_elev, se toma la altura interpolada a resolución entera del propio
+    mirador.
     """
     lat = float(lat); lon = float(lon)
     if obs_elev is None:
@@ -230,7 +235,7 @@ def horizon_fine(lat, lon, azimuths, obs_elev=None, eye_h=1.6, d_min=60.0,
 
 
 def sea_horizon_dip(obs_elev, eye_h=1.6):
-    """Apparent depression of the sea horizon (deg) -- the theoretical best case."""
+    """Depresión aparente del horizonte marino (grados): el mejor caso teórico."""
     h = np.asarray(obs_elev, dtype=np.float64) + eye_h
     return -np.degrees(np.sqrt(2.0 * h * (1.0 - K_REFR) / R_EARTH))
 

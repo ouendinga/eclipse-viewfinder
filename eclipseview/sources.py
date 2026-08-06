@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
-"""External data and reference values, each with its citation.
+"""Datos externos y valores de referencia, cada uno con su cita.
 
-Nothing in this file is computed by this project. It is kept separate on purpose so
-that the boundary between "what the code works out" and "what someone else published"
-is visible in the code, not just in the prose.
+Nada de este fichero lo calcula el proyecto. Va aparte a propósito para que la
+frontera entre «lo que deduce el código» y «lo que publicó otro» se vea en el código,
+y no sólo en la prosa.
 
-Two kinds of entries:
-  * REFERENCE_* -- published values used to VERIFY our engine (see tests/).
-  * CLIMATOLOGY -- August cloud statistics, which we cannot derive from ephemerides
-    and terrain, and which the report must therefore attribute.
+Dos clases de entradas:
+  * REFERENCE_* -- valores publicados que sirven para VERIFICAR el motor (ver tests/).
+  * CLIMATOLOGY -- estadística de nubes de agosto, que no se puede sacar de las
+    efemérides ni del terreno y que por tanto el informe tiene que atribuir.
 """
 
 EVENT = {
@@ -72,7 +72,7 @@ CITATIONS = {
 
 # --------------------------------------------------------------- verification
 
-# Point of greatest eclipse and its published circumstances (NASA GSFC).
+# Punto de máximo eclipse y sus circunstancias publicadas (NASA GSFC).
 REFERENCE_GREATEST = {
     'lat': 65 + 10.0 / 60, 'lon': -(25 + 14.4 / 60),
     'duration_s': 138.2,            # 2m18.2s
@@ -82,9 +82,10 @@ REFERENCE_GREATEST = {
     'tolerance_time_s': 30.0,
 }
 
-# City circumstances published by the IGN. Coordinates are the ones we evaluate at;
-# the published duration depends on exactly where in the municipality you stand, so
-# the tolerance is deliberately loose. The Sun's ALTITUDE is the tight check.
+# Circunstancias de ciudades publicadas por el IGN. Las coordenadas son en las que
+# evaluamos; la duración publicada depende de en qué punto exacto del municipio te
+# pongas, así que la tolerancia es holgada a propósito. La comprobación estricta es
+# la ALTURA del Sol.
 REFERENCE_CITIES = [
     {'name': 'A Coruña', 'lat': 43.3623, 'lon': -8.4115, 'elev': 20,
      'duration_s': 76, 'sun_alt_deg': 12, 'source': 'ign'},
@@ -92,8 +93,9 @@ REFERENCE_CITIES = [
      'duration_s': 104, 'sun_alt_deg': 8, 'source': 'ign'},
 ]
 
-# Independently reported for the northern edge of the path (a decision-relevant claim:
-# it is what makes totality reachable from the Barcelona area at all).
+# Publicado por su cuenta para el borde norte de la franja, y es una afirmación que
+# cambia decisiones: es lo que hace que la totalidad sea alcanzable desde el área de
+# Barcelona.
 # Antes citaba al Diari de Tarragona "1 m 02 s". Comprobado el 2026-08-05 abriendo el
 # artículo: dice "alrededor de 55 segundos". O sea, la cita no sostenía la cifra, y con
 # una tolerancia de 8 s ninguna de las dos versiones hacía saltar el aviso. Se sustituye
@@ -109,8 +111,8 @@ REFERENCE_EDGE = [
                    '43148_Tarragona_Tarragona.jpg'},
 ]
 
-# Barcelona is outside the umbra. Worth asserting because it is the single fact most
-# likely to send someone to the wrong place.
+# Barcelona queda fuera de la umbra. Merece un test porque es el dato con más
+# papeletas para mandar a alguien al sitio equivocado.
 REFERENCE_PARTIAL = [
     {'name': 'Barcelona', 'lat': 41.3874, 'lon': 2.1686, 'elev': 20},
 ]
@@ -146,8 +148,9 @@ LUNAR_UMBRAL_RADIUS = {
 
 # --------------------------------------------------------------- climatology
 
-# August cloud prospects along the Spanish track. These are QUOTED, not computed.
-# Keep the wording close to the source and always render the attribution with them.
+# Perspectivas de nubes de agosto a lo largo de la franja española. Están CITADAS, no
+# calculadas: hay que mantener la redacción cerca de la fuente y pintar siempre la
+# atribución junto a ellas.
 CLIMATOLOGY = {
     'source': 'eclipsophile',
     'note': ('Climatología de agosto publicada por Jay Anderson (Eclipsophile). '
@@ -183,7 +186,7 @@ CLIMATOLOGY = {
         'movilidad es la mayor ventaja para este eclipse.'),
 }
 
-# The other two eclipses over Spain, for context. Published figures.
+# Los otros dos eclipses sobre España, para dar contexto. Cifras publicadas.
 OTHER_ECLIPSES = [
     {'date': '2027-08-02', 'kind': 'total',
      'where': 'Andalucía (Cádiz, Málaga, Granada, Almería) y Ceuta',

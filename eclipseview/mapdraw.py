@@ -1,8 +1,9 @@
-"""Render a map of the totality band over Iberia, from our own DEM mosaic.
+"""Dibuja el mapa de la franja de totalidad sobre la Península, con nuestro propio
+mosaico de elevaciones.
 
-Writes map.svg: a terrain raster (PNG embedded as a data URI, encoded by hand with
-zlib -- no image libraries needed) plus the centreline, the band limits and the
-recommended sites drawn as SVG on top.
+Escribe map.svg: un ráster del terreno (un PNG incrustado como data URI, codificado a
+mano con zlib, sin librerías de imagen) más la línea central, los límites de la franja
+y los miradores recomendados, dibujados en SVG por encima.
 """
 import json, os, struct, zlib, base64
 import numpy as np
@@ -91,15 +92,15 @@ def terrain_raster():
 
 
 def contour_segments(grid, lats, lons, level):
-    """Marching squares: segments where `grid` crosses `level`, in (lon, lat).
+    """Marching squares: los segmentos donde `grid` cruza `level`, en (lon, lat).
 
-    Written out rather than pulled from a plotting library because the map is hand
-    drawn as SVG and the whole project ships with only numpy.
+    Está escrito a mano en vez de sacado de una librería de gráficos porque el mapa se
+    dibuja a mano en SVG y todo el proyecto se apaña con numpy y nada más.
     """
     segs = []
     for i in range(len(lats) - 1):
         for j in range(len(lons) - 1):
-            # corners, counter-clockwise from bottom-left
+            # las esquinas, en sentido antihorario desde la de abajo a la izquierda
             v = [grid[i, j], grid[i, j + 1], grid[i + 1, j + 1], grid[i + 1, j]]
             if min(v) > level or max(v) < level:
                 continue
@@ -129,7 +130,7 @@ def main():
 
     lim_path = LIMITS_JSON
     if os.path.exists(lim_path):
-        # exact limits, solved by bisection with the real engine
+        # los límites exactos, resueltos por bisección con el motor de verdad
         with open(lim_path) as fh:
             lim = json.load(fh)
         centre = [(r['lon'], r['centre']) for r in lim]
@@ -152,8 +153,8 @@ def main():
     def path(pts):
         return ' '.join(f'{X(lo):.1f},{Y(la):.1f}' for lo, la in pts)
 
-    # Every recommended viewpoint, coloured by the margin that survives trees and
-    # buildings. The map and the search now show the same dataset.
+    # Cada mirador recomendado, coloreado por el margen que sobrevive a los árboles y
+    # a los edificios. El mapa y el buscador enseñan ya el mismo conjunto.
     pts_path = os.path.join(DATA_DIR, 'points.json')
     sites = []
     if os.path.exists(pts_path):
@@ -185,9 +186,9 @@ def main():
                  f'fill-opacity="0.9" stroke="#0e1116" stroke-width="0.7"/>')
     # a few reference cities for orientation
     # --- Sun altitude at maximum, as contours -------------------------------
-    # Xavier Jubier's map draws the line where maximum eclipse coincides with sunset.
-    # For this project the useful generalisation is the whole family: how high the Sun
-    # actually is, which is what decides whether the terrain swallows it.
+    # El mapa de Xavier Jubier dibuja la línea donde el máximo del eclipse coincide
+    # con la puesta de Sol. Para este proyecto lo útil es la familia entera: a qué
+    # altura está el Sol de verdad, que es lo que decide si el terreno se lo come.
     las_f, lons_f = f['lats'], f['lons']
     mag = f['mag']
     inside = mag >= 0.90
@@ -200,7 +201,7 @@ def main():
                      for a, b in segs)
         o.append(f'<path d="{d}" fill="none" stroke="#7fd4ff" stroke-opacity="0.5" '
                  f'stroke-width="0.9" stroke-dasharray="2 3"/>')
-        # label on the segment closest to the middle of the drawn map
+        # la etiqueta va en el segmento más cercano al centro del mapa dibujado
         mid = min(segs, key=lambda sg: abs(sg[0][0] - (LO_W + LO_E) / 2))
         o.append(f'<text x="{X(mid[0][0]):.1f}" y="{Y(mid[0][1]):.1f}" '
                  f'fill="#7fd4ff" fill-opacity="0.85" font-size="9" '
