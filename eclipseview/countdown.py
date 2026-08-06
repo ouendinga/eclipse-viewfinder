@@ -24,9 +24,10 @@ def _utc_iso(ev, hhmm):
 
 
 CSS = """
+/* Sólo borde ARRIBA: va dentro de header.top, que ya cierra con el suyo, y con los dos
+   salían dos rayas seguidas. */
 .cdown{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px 18px;
-  border-top:1px solid var(--line);border-bottom:1px solid var(--line);
-  padding:14px 0;margin:22px 0 0}
+  border-top:1px solid var(--line);padding:14px 0 0;margin:22px 0 0}
 .cdown .lab{font:600 10px var(--mono);letter-spacing:.16em;text-transform:uppercase;
   color:var(--dim)}
 .cdown .clock{display:flex;gap:14px;align-items:baseline}

@@ -95,7 +95,7 @@ def html(max_radius=MAX_RADIUS_KM, default_radius=DEFAULT_RADIUS_KM):
       <div class="fld">
         <label for="q">Localidad</label>
         <input type="text" id="q" autocomplete="off" spellcheck="false"
-               placeholder="Malgrat de Mar, Soria, Zaragoza…"
+               placeholder="Aguilar de Campoo, Soria, Zaragoza…"
                aria-describedby="fstatus">
         <div class="sugg" id="sugg" role="listbox" aria-label="Localidades"></div>
       </div>
