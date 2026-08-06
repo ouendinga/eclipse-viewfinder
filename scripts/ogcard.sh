@@ -8,10 +8,12 @@
 #
 # NO va en el build: el PNG se versiona y sólo se regenera si cambia el diseño.
 set -uo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
-PW="${PW:-/home/alvaro/projects/folio-doctor/node_modules/playwright}"
-[ -d "$PW" ] || { echo "no encuentro playwright en $PW (pásalo con PW=...)"; exit 1; }
+# Playwright no es dependencia del proyecto: la tarjeta se genera una vez y arrastrar
+# un navegador entero por eso no compensa. Se le pasa dónde está instalado.
+PW="${PW:?ruta al paquete playwright, p.ej. PW=./node_modules/playwright}"
+[ -d "$PW" ] || { echo "no encuentro playwright en $PW"; exit 1; }
 
 OUT="site/og.png"
 TMP="$(mktemp -d)"

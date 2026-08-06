@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Añade el perfil de accesibilidad (vías, firme, 4x4, sendero) a points.json
 set -uo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 .venv/bin/python - <<'PY'
 import json, os, sys, time
 from eclipseview import obstacles, recommend, events

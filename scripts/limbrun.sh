@@ -7,7 +7,7 @@
 # modelo sea más fino. Lo que aporta el limbo es la respuesta a la pregunta que de
 # verdad importa en el filo: ¿hay corona o no la hay?
 set -uo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 .venv/bin/python - <<'PY'
 import json, os, sys, time
 from eclipseview import events, limb, recommend

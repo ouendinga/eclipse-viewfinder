@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # Despliega el sitio estático en Vercel y deja el subdominio apuntando.
-# El token sale de projects/services.md, nunca del repo.
+#
+# Las credenciales se pasan por entorno y no se leen de ningún fichero: una ruta
+# escrita aquí le diría a cualquiera dónde ir a buscarlas.
 set -euo pipefail
-HERE="$(cd "$(dirname "$0")" && pwd)"
-SERVICES="${SERVICES_MD:-/home/alvaro/projects/services.md}"
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
 DOMAIN="${DOMAIN:-eclipse.alvarosolis.dev}"
 PROJECT="${PROJECT:-eclipse-viewfinder}"
 
-TOKEN="$(grep -oE 'vcp_[A-Za-z0-9]+' "$SERVICES" | head -1)"
-TEAM="$(grep -oE 'team_[A-Za-z0-9]+' "$SERVICES" | head -1)"
-[ -n "$TOKEN" ] || { echo "No encuentro el token de Vercel en $SERVICES"; exit 1; }
+TOKEN="${VERCEL_TOKEN:?exporta VERCEL_TOKEN}"
+TEAM="${VERCEL_TEAM:?exporta VERCEL_TEAM}"
 
 cd "$HERE/site"
 echo "→ desplegando $(ls *.html | wc -l) páginas a producción..."

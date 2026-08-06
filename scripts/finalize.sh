@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Filtra el dataset, reconstruye el sitio y redespliega.
 set -uo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 until grep -q '^OK enriquecido' /tmp/enrich2.log 2>/dev/null; do
   grep -qE 'Traceback' /tmp/enrich2.log 2>/dev/null && { echo "FALLO en el enriquecido"; exit 1; }
   sleep 30
@@ -44,7 +44,7 @@ from eclipseview import site
 out, data = site.build(out_dir='site', progress=lambda m: print(' ', m, flush=True))
 print('sitio ->', out, '| verificación', data['summary']['passed'], '/', data['summary']['total'])
 " || exit 1
-TOKEN="$(grep -oE 'vcp_[A-Za-z0-9]+' /home/alvaro/projects/services.md | head -1)"
+TOKEN="${VERCEL_TOKEN:?exporta VERCEL_TOKEN antes de desplegar}"
 cd site && npx --yes vercel@latest deploy --prod --yes --token "$TOKEN" --name eclipse-viewfinder 2>&1 | tail -1
 echo "== redesplegado =="
 curl -s -o /dev/null -w "produccion -> %{http_code}\n" https://eclipse.alvarosolis.dev/

@@ -7,7 +7,7 @@
 # Overpass. El terreno no ha cambiado —el perfil del horizonte de cada punto es el
 # mismo—, lo único que cambia al tocar el radio lunar es la geometría del eclipse.
 set -uo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 .venv/bin/python - <<'PY'
 import json, os, sys, time
 import numpy as np

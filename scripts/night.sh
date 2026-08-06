@@ -12,7 +12,7 @@
 #       OVERPASS_MIN_INTERVAL=90 ./night.sh
 # Programarlo:  ./night.sh --programar 03:30
 set -uo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 export OVERPASS_MIN_INTERVAL="${OVERPASS_MIN_INTERVAL:-60}"
 LOG="${LOG:-$PWD/reports/night-$(date +%Y%m%d-%H%M).log}"

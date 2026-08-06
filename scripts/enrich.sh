@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Completa el chequeo de árboles y edificios sobre points.json y redespliega.
 set -uo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 .venv/bin/python - <<'PY'
 import json, sys, time
 from eclipseview import recommend, obstacles, events

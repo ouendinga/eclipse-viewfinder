@@ -1,4 +1,7 @@
-# CLAUDE.md — eclipse-viewfinder
+# Notas de ingeniería
+
+Lo que hay que saber antes de tocar el motor: por qué está montado así y qué fallos
+ya se pagaron. Los detalles de cada módulo van en su propio código.
 
 ## Qué es
 Herramienta que decide **desde dónde ver un eclipse** cruzando la geometría del evento
@@ -62,6 +65,8 @@ Todo lo pesado en `data/` (ignorado por git): teselas DEM, mosaico, campo del ec
 caché del gazetteer. Se reconstruye con `eclipseview setup`.
 
 ## Estilo
+- **Comentarios en español, código en inglés.** Nombres, cadenas internas y mensajes
+  de error del motor, en inglés; la explicación de por qué algo está así, en español.
 - Comentarios donde el *porqué* no es obvio, no donde el *qué* ya se lee.
 - Números en informes con coma decimal en español, punto en inglés (`i18n.number`).
 - Commits por bloque, no un tocho al final.

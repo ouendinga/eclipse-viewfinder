@@ -89,22 +89,23 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 | comprobación | calculado | publicado | fuente |
 |---|---|---|---|
-| Máximo eclipse: duración | 141,3 s | 138,2 s | NASA GSFC |
+| Máximo eclipse: duración | 138,3 s | 138,2 s | NASA GSFC |
 | Máximo eclipse: instante | 17:46:03 | 17:46:01 UTC | NASA GSFC |
-| A Coruña: duración / altura | 79,4 s / 12,0° | 76 s / 12° | IGN |
-| Burgos: duración / altura | 106,4 s / 8,3° | 104 s / 8° | IGN |
-| Tarragona: duración | 64,2 s | 62 s | Diari de Tarragona |
-| Barcelona: ¿totalidad? | no | no | IGN |
+| A Coruña: duración / altura | 75,4 s / 12,0° | 76 s / 12° | IGN |
+| Burgos: duración / altura | 103,7 s / 8,3° | 104 s / 8° | IGN |
+| Tarragona: duración / altura | 59,5 s / 4,35° | 59 s / 4,2° | IGN |
+| Barcelona: ¿totalidad? | no (99,82 %) | no | IGN |
 | Horizonte marino (cabo Vilán) | −0,127° | −0,127° | analítico |
 | Moncayo desde Zaragoza | +1,16° a 79 km | +1,20° a 80 km | cálculo a mano |
-| Anchura de la sombra | 300 km | 294 km | NASA GSFC |
+| Anchura de la sombra | 292 km | 294 km | NASA GSFC |
 
-**Sesgo conocido y documentado:** las duraciones salen un 2–3 % largas frente al IGN
-por el convenio de radio lunar. Cuéntalas como ±3 s; para horarios oficiales, el IGN.
-Hay un test que vigila que ese sesgo siga siendo pequeño y positivo.
+El peor desvío en duración es de **0,6 s**. No siempre fue así: con el radio lunar
+medio, que es el que parece el correcto, salían hasta 4,7 s largas. El radio de los
+contactos umbrales está ajustado contra estas mismas cifras en `sources.py`, y hay un
+test que rehace el ajuste para que nadie lo toque a ojo.
 
 ```bash
-.venv/bin/python -m unittest discover -s tests -v     # 24 tests
+.venv/bin/python -m unittest discover -s tests -v     # 51 tests
 ```
 
 ## Datos
@@ -137,7 +138,7 @@ instrumentado, precarga de los mejores sitios, y el resto de eclipses y regiones
 - [docs/verificacion.md](docs/verificacion.md) — contra qué se contrasta
 - [docs/fuentes.md](docs/fuentes.md) — de dónde sale cada dato
 - [docs/roadmap.md](docs/roadmap.md) — qué falta
-- [CLAUDE.md](CLAUDE.md) — contexto para trabajar en el repo
+- [docs/ingenieria.md](docs/ingenieria.md) — arquitectura y las trampas que ya costaron caro
 
 ## Licencia
 

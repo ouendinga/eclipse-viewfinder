@@ -23,13 +23,35 @@ NEAR_FAR_SPLIT = 25000.0  # m: below this use full-res, above use the mosaic
 
 _here = os.path.dirname(os.path.abspath(__file__))
 
-_meta = json.load(open(MOSAIC_JSON))
-PER_DEG = _meta['per_deg']
-LAT_N, LON_W = _meta['lat_n'], _meta['lon_w']
-ROWS, COLS = _meta['rows'], _meta['cols']
-
+_meta = None
 _dem = None
 _tiles = {}
+
+_META_KEYS = {'PER_DEG': 'per_deg', 'LAT_N': 'lat_n', 'LON_W': 'lon_w',
+              'ROWS': 'rows', 'COLS': 'cols'}
+
+
+def meta():
+    global _meta
+    if _meta is None:
+        with open(MOSAIC_JSON) as f:
+            _meta = json.load(f)
+    return _meta
+
+
+def __getattr__(name):
+    """Las dimensiones del mosaico se leen al usarlas, no al importar.
+
+    Importar este módulo tiene que funcionar en un clon recién bajado, donde
+    `data/` todavía no existe: si no, ni siquiera se pueden lanzar los tests de
+    geometría, que no tocan el terreno para nada. Con PEP 562 los nombres de
+    siempre (PER_DEG, LAT_N…) se resuelven igual, pero sólo cuando alguien los
+    pide de verdad.
+    """
+    key = _META_KEYS.get(name)
+    if key is None:
+        raise AttributeError(f'module {__name__!r} has no attribute {name!r}')
+    return meta()[key]
 
 
 def dem():
@@ -43,13 +65,16 @@ def dem():
 
 def elev_at(lat, lon):
     """Nearest-cell elevation (m) from the max-pooled mosaic. Sea / outside -> 0."""
+    m = meta()
+    per_deg, lat_n, lon_w = m['per_deg'], m['lat_n'], m['lon_w']
+    rows, cols = m['rows'], m['cols']
     lat = np.asarray(lat, dtype=np.float64)
     lon = np.asarray(lon, dtype=np.float64)
-    r = np.rint((LAT_N - lat) * PER_DEG).astype(np.int64)
-    c = np.rint((lon - LON_W) * PER_DEG).astype(np.int64)
-    ok = (r >= 0) & (r < ROWS) & (c >= 0) & (c < COLS)
+    r = np.rint((lat_n - lat) * per_deg).astype(np.int64)
+    c = np.rint((lon - lon_w) * per_deg).astype(np.int64)
+    ok = (r >= 0) & (r < rows) & (c >= 0) & (c < cols)
     out = np.zeros(np.shape(r), dtype=np.float64)
-    v = dem()[np.clip(r, 0, ROWS - 1), np.clip(c, 0, COLS - 1)].astype(np.float64)
+    v = dem()[np.clip(r, 0, rows - 1), np.clip(c, 0, cols - 1)].astype(np.float64)
     out[ok] = v[ok]
     return np.maximum(out, 0.0)
 
