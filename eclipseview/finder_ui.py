@@ -393,6 +393,18 @@ def script(max_radius=MAX_RADIUS_KM):
         'lo resuelven.';
       risk='<span class="risk" tabindex="0" role="note" aria-label="'+tip+'">'+
            'SIN TOTALIDAD SEGURA<span class="tip">'+tip+'</span></span>';
+    } else if(!p.total && p.total_limb){
+      // El caso contrario, y el más frecuente: la esfera no ve totalidad y el perfil
+      // real del limbo sí, unos segundos. Callarlo sería esconder un cálculo que
+      // tenemos. Prometerlo, mentir. Se dice lo que hay.
+      tip='Justo en el filo. Con la Luna como esfera aquí no hay totalidad, pero con el '+
+        'perfil real de su limbo —los montes del borde, medidos por la sonda LRO— '+
+        'salen unos '+n(p.dur_limb,0)+' s. Puede que veas corona unos segundos, o sólo '+
+        'las perlas de Baily. Si vas a por la corona, muévete hacia el centro de la '+
+        'franja; si te pilla de paso, mira igual: un '+n(p.obsc,1)+'% ya es un '+
+        'espectáculo.';
+      risk='<span class="risk" tabindex="0" role="note" aria-label="'+tip+'">'+
+           'PUEDE HABER UNOS SEGUNDOS<span class="tip">'+tip+'</span></span>';
     } else if(p.total && durLo(p) < 30){
       tip='Con unos '+n(durLo(p),0)+' s est\u00e1s en el filo de la sombra. Los dos modelos '+
         'ven totalidad \u2014el de esfera, calibrado contra el IGN, y el del perfil real '+
