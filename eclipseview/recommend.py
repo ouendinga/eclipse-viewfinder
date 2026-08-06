@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
-"""Precomputed recommendation points for one eclipse.
+"""Miradores precalculados para un eclipse.
 
-The insight that makes the site work without a backend: the answer to "where should I
-go from X" does not depend on X. It is always the same set of good viewpoints; X and
-the radius only decide which of them are close enough. So compute the viewpoints once,
-ship them, and let the query be a filter.
+La idea que permite que el sitio funcione sin servidor: la respuesta a «desde dónde
+voy si salgo de X» no depende de X. Es siempre el mismo conjunto de buenos miradores;
+X y el radio sólo deciden cuáles caen cerca. Así que los miradores se calculan una
+vez, se publican, y la consulta se queda en un filtro.
 
-This dataset is specific to ONE eclipse: the Sun's azimuth and altitude at every point
-are baked into the clearances and into the drawn horizon.
+Este conjunto vale para UN eclipse: el azimut y la altura del Sol en cada punto están
+horneados dentro de los márgenes y del horizonte dibujado.
 
-Output (points.json):
-  meta   - event, azimuth window, how the set was built
-  points - one entry per recommended viewpoint, including a compact horizon profile so
-           the browser can draw the panorama without shipping an SVG each.
+Salida (points.json):
+  meta   - evento, ventana de azimut, cómo se construyó el conjunto
+  points - una entrada por mirador, con un perfil de horizonte compacto para que el
+           navegador dibuje el panorama sin mandar un SVG por punto.
 """
 import json
 import os
@@ -26,31 +26,33 @@ from .ephem import circumstances, sun_track
 from .panorama import AZ_LO, AZ_HI
 from .paths import DATA_DIR, SCAN_PKL
 
-# Prefer the magnitude-selected sweep: it reaches the deep-partial ground outside the
-# path, so a town 100 km north of the shadow gets viewpoints instead of an empty list.
+# Se prefiere el barrido seleccionado por magnitud: llega al terreno de parcial
+# profundo fuera de la franja, así que un pueblo 100 km al norte de la sombra recibe
+# miradores en vez de una lista vacía.
 WIDE_PKL = os.path.join(DATA_DIR, 'scan_wide.pkl')
 from .terrain import elev_fine, horizon_fine
 
-# Horizon sampled across the plotted window; 0.25 deg is finer than the Sun's diameter.
+# El horizonte se muestrea en toda la ventana dibujada; 0,25° es más fino que el
+# diámetro del Sol.
 AZ_STEP = 0.25
 AZIMUTHS = np.arange(AZ_LO, AZ_HI + 1e-9, AZ_STEP)
 
-MIN_CLEAR = 2.0        # a recommendation must have real margin, not just be positive
-SEP_KM = 14.0          # spacing inside the path; ~1100 cells over the band
+MIN_CLEAR = 2.0        # recomendar exige margen de verdad, no que salga positivo
+SEP_KM = 14.0          # separación dentro de la franja; ~1100 celdas sobre la banda
 MAX_POINTS = 700
 
 
 def select(scan_path=None, min_clear=MIN_CLEAR, sep_km=SEP_KM,
            sep_km_partial=25.0, max_points=2000, progress=None):
-    """Pick the BEST viewpoint in each cell, rather than the globally top-scoring ones.
+    """Coge el MEJOR mirador de cada celda, no los mejores del ranking global.
 
-    Ranking globally looks sensible and is wrong: totality outscores everything, so the
-    whole quota lands inside the path and a town 100 km outside it gets an empty
-    result. Coverage is the requirement here, so the map is divided into cells and each
-    cell contributes its own best spot.
+    Ordenar globalmente parece lo sensato y está mal: la totalidad le gana a todo, así
+    que el cupo entero cae dentro de la franja y un pueblo a 100 km fuera se queda sin
+    resultados. Aquí lo que se exige es cobertura, así que el mapa se parte en celdas
+    y cada celda aporta su propio mejor sitio.
 
-    Cells are finer inside the path (where people will actually travel) and coarser
-    outside it, which keeps the dataset small without leaving holes.
+    Las celdas son más finas dentro de la franja (donde la gente va a ir de verdad) y
+    más gruesas fuera, que mantiene el conjunto pequeño sin dejar agujeros.
     """
     scan_path = scan_path or (WIDE_PKL if os.path.exists(WIDE_PKL) else SCAN_PKL)
     with open(scan_path, 'rb') as f:
@@ -74,12 +76,13 @@ def select(scan_path=None, min_clear=MIN_CLEAR, sep_km=SEP_KM,
         if cur is None or score[pos] > cur[0]:
             best[key] = (score[pos], int(i))
 
-    # Cap each category separately. A single global cap sorted by score is the bug
-    # this function exists to avoid: totality always wins it, and the partial cells --
-    # the ones a city outside the path depends on -- get truncated away.
+    # El tope se aplica por categoría. Un tope global ordenado por puntuación es
+    # justo el fallo que esta función existe para evitar: la totalidad siempre lo gana
+    # y las celdas de parcial —de las que depende una ciudad fuera de la franja— se
+    # quedan cortadas.
     tot = sorted(((k, v) for k, v in best.items() if k[0]), key=lambda t: -t[1][0])
     par = sorted(((k, v) for k, v in best.items() if not k[0]), key=lambda t: -t[1][0])
-    # No global cap: every cell that exists is a place someone might be standing.
+    # Sin tope global: cada celda que existe es un sitio donde alguien puede estar.
     n_tot = min(len(tot), max_points)
     n_par = min(len(par), max_points)
     picks = [v[1] for _, v in tot[:n_tot]] + [v[1] for _, v in par[:n_par]]
@@ -105,7 +108,8 @@ def build(out_path=None, progress=None, geocode=True, event=None,
         c = circumstances(la, lo, e)
         hz = horizon_fine(la, lo, AZIMUTHS, obs_elev=e)
 
-        # Sun track every 10 min through the plotted window, for the browser to draw.
+        # Traza del Sol cada 10 min por la ventana dibujada, para que la pinte el
+        # navegador.
         t0 = _ts_utc(ev, -60)
         t1 = _ts_utc(ev, 75)
         saz, _, salt, _ = sun_track(la, lo, e, t0, t1, step_s=600.0)
@@ -136,7 +140,7 @@ def build(out_path=None, progress=None, geocode=True, event=None,
             t=_local(ev, c['max_utc']),
             t2=_local(ev, c['c2_utc']) if total else None,
             t3=_local(ev, c['c3_utc']) if total else None,
-            # horizon profile in hundredths of a degree keeps the payload small
+            # el perfil en centésimas de grado mantiene pequeño lo que se descarga
             prof=[int(round(v * 100)) for v in hz],
             sun=[[round(float(a), 2), round(float(v), 2)]
                  for a, v in zip(saz[keep], salt[keep])],
@@ -148,9 +152,9 @@ def build(out_path=None, progress=None, geocode=True, event=None,
     _dump(out_path, ev, points)
 
     if check_obstacles:
-        # The DEM's blind spot, filled from OpenStreetMap: trees and buildings in the
-        # sight line. The IGN's visualiser states it ignores both; this is where we
-        # can actually do better rather than just finer.
+        # El punto ciego del modelo de elevación, tapado con OpenStreetMap: árboles y
+        # edificios en la línea de visión. El visor del IGN dice que ignora los dos;
+        # aquí es donde de verdad se puede hacer mejor, y no sólo más fino.
         enrich_obstacles(points, progress=progress)
 
     if geocode:
@@ -204,13 +208,14 @@ def drop_offshore(points, progress=None, retry=True):
 
 
 def enrich_obstacles(points, progress=None):
-    """Add the trees-and-buildings check to points already computed.
+    """Añade la comprobación de árboles y edificios a puntos ya calculados.
 
-    Kept separate and resumable on purpose: the public Overpass instances go down or
-    saturate (observed: HTTP 504 "server too busy" on one, no answer at all on two
-    others), and a viewpoint dataset must not depend on a third party being healthy at
-    the moment it is built. Points not checked keep obs_ok=False, which the interface
-    must render as "sin comprobar" -- never as "clear".
+    Va aparte y se puede reanudar a propósito: las instancias públicas de Overpass se
+    caen o se saturan (visto: HTTP 504 «server too busy» en una, y silencio total en
+    otras dos), y un conjunto de miradores no puede depender de que un tercero esté
+    sano justo el rato en que se construye. Los puntos sin comprobar se quedan con
+    obs_ok=False, que la interfaz tiene que pintar como «sin comprobar» y nunca como
+    «despejado».
     """
     lookup = lambda a, b: float(elev_fine(a, b)[0])          # noqa: E731
     items = [(p['lat'], p['lon'], p['az'], p['elev']) for p in points]
@@ -350,7 +355,7 @@ def _dump(out_path, ev, points, extra=None):
 
 
 def _ts_utc(ev, minutes_from_mid):
-    """A skyfield Time offset from the middle of the event's search window."""
+    """Un Time de skyfield desplazado desde el centro de la ventana de búsqueda."""
     from .ephem import _ts
     h0, m0 = ev.search_start_utc
     h1, m1 = ev.search_end_utc

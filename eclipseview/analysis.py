@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Analysis shared by both reports: evaluate a spot, search an area, rate a zone.
+"""El análisis que comparten los dos informes: evaluar un sitio, buscar en un área,
+puntuar una zona.
 
-The whole project turns on one number, the **clearance**: how many degrees separate
-the Sun from the real skyline while the eclipse is at its best. Everything here exists
-to compute that honestly.
+Todo el proyecto gira sobre un único número, el **margen libre**: cuántos grados
+separan al Sol de la silueta real del terreno mientras el eclipse está en lo mejor.
+Lo que hay aquí existe para calcular eso con honradez.
 """
 import json
 import numpy as np
@@ -12,9 +13,9 @@ from . import field, panorama
 from .ephem import circumstances
 from .terrain import (elev_at, elev_fine, horizon_fine, horizon_per_point)
 
-# Ray sampling for the ranking pass. 150 km is enough: to intrude above 1 deg from
-# further away, terrain would have to exceed 3 km, which does not happen west of
-# the Spanish track.
+# Muestreo de rayos de la pasada de ranking. 150 km bastan: para asomar por encima
+# de 1° desde más lejos, el terreno tendría que pasar de 3 km, y eso no ocurre al
+# oeste de la franja española.
 RANK_DISTS = np.concatenate([np.arange(400.0, 25000.0, 180.0),
                              np.arange(25000.0, 150000.0, 800.0)])
 
@@ -27,8 +28,9 @@ def km(la1, lo1, la2, lo2):
 
 
 def snap_to_peak(lat, lon, radius_km=1.0, n=21):
-    """Move to the highest 30 m cell nearby. Geocoders routinely place a named summit
-    hundreds of metres off, or in the wrong valley entirely."""
+    """Se mueve a la celda de 30 m más alta que tenga cerca. Los geocodificadores
+    colocan una cumbre con nombre a cientos de metros del sitio, o directamente en el
+    valle de al lado."""
     dla = radius_km / 111.2
     dlo = radius_km / (111.32 * np.cos(np.radians(lat)))
     las = np.linspace(lat - dla, lat + dla, n)
@@ -39,7 +41,7 @@ def snap_to_peak(lat, lon, radius_km=1.0, n=21):
 
 
 def evaluate(lat, lon, label=None, snap_km=0.0, with_svg=True):
-    """Exact circumstances plus the 30 m skyline for a single spot."""
+    """Circunstancias exactas más la silueta a 30 m para un solo sitio."""
     if snap_km > 0:
         lat, lon = snap_to_peak(lat, lon, snap_km)
 
@@ -53,8 +55,8 @@ def evaluate(lat, lon, label=None, snap_km=0.0, with_svg=True):
                              return_distance=True)
 
     if c['total']:
-        # The Sun must clear the ground for the WHOLE of totality, and it is sinking,
-        # so take the worse of the two contacts.
+        # El Sol tiene que librar el terreno durante TODA la totalidad, y va bajando,
+        # así que se coge el peor de los dos contactos.
         clear = min(c['c2_alt_app'] - float(np.interp(c['c2_az'], azs, hz)),
                     c['c3_alt_app'] - float(np.interp(c['c3_az'], azs, hz)))
         alt_ref, az_ref = c['c3_alt_app'], c['c3_az']
@@ -88,11 +90,13 @@ def _local(iso):
 
 def search_area(olat, olon, radius_km, min_clear=1.5, want=6, sep_km=None,
                 overfetch=3):
-    """Rank candidates in a disc around a point. Returns (lat, lon) pairs, best first.
+    """Ordena candidatos en un disco alrededor de un punto. Devuelve pares
+    (lat, lon), el mejor primero.
 
-    Coarse pass only -- callers must re-check each winner with evaluate(), which uses
-    the real 30 m surface. The mosaic used here max-pools to 185 m, which is the
-    conservative choice for ridge crests but says nothing about trees or buildings.
+    Es sólo la pasada gruesa: quien llame tiene que recomprobar cada ganador con
+    evaluate(), que usa la superficie real a 30 m. El mosaico de aquí agrupa por
+    máximo a 185 m, que es lo conservador para las crestas pero no dice nada de
+    árboles ni de edificios.
     """
     f = field.load()
     step_km = float(np.clip(radius_km / 55.0, 0.25, 1.5))
@@ -110,8 +114,8 @@ def search_area(olat, olon, radius_km, min_clear=1.5, want=6, sep_km=None,
     if LA.size == 0:
         return [], 0, 0
 
-    # The OBSERVER's height must come from the real 30 m surface. Taken from the
-    # max-pooled mosaic it would put you on top of the ridge you are standing below.
+    # La altura del OBSERVADOR tiene que salir de la superficie real a 30 m. Sacada
+    # del mosaico agrupado por máximo, te subiría a la cresta que tienes delante.
     elev = elev_fine(LA, LO)
     dur = field.interp(f['dur'], LA, LO)
     mag = field.interp(f['mag'], LA, LO)
@@ -142,11 +146,11 @@ def search_area(olat, olon, radius_km, min_clear=1.5, want=6, sep_km=None,
 
 
 def zone_stats(clat, clon, half_km=9.0, n=13, threshold=2.0):
-    """Is a good horizon a property of the AREA, or of one lucky pixel?
+    """¿Un buen horizonte es propiedad del ÁREA, o de un píxel con suerte?
 
-    Evaluates a grid at full 30 m resolution and reports the spread. This is the
-    number that reorders naive rankings: a spectacular viewpoint surrounded by
-    blocked ground is a worse bet than a mediocre one in forgiving country.
+    Evalúa una rejilla a 30 m enteros y devuelve el reparto. Es el número que
+    reordena los rankings ingenuos: un mirador espectacular rodeado de terreno
+    tapado es peor apuesta que uno mediocre en un sitio que perdona.
     """
     c = circumstances(clat, clon, 0.0)
     if c['total']:
@@ -181,7 +185,7 @@ def zone_stats(clat, clon, half_km=9.0, n=13, threshold=2.0):
 
 
 def path_limits():
-    """North/south umbral limits and perpendicular width, from the bisected file."""
+    """Límites umbrales norte y sur y anchura perpendicular, del fichero bisecado."""
     from .paths import LIMITS_JSON
     import os
     if not os.path.exists(LIMITS_JSON):

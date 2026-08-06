@@ -1,14 +1,17 @@
-"""Local circumstances of the 2026-08-12 total solar eclipse, computed from JPL DE421.
+"""Circunstancias locales del eclipse total del 12-08-2026, con las efemérides DE421.
 
-For a given (lat, lon, h) we find:
-  - C2 (start of totality), max eclipse, C3 (end of totality)
-  - duration of totality
-  - apparent (refracted) altitude and azimuth of the Sun at each instant
+Para un (lat, lon, h) dado se resuelven:
+  - C2 (empieza la totalidad), máximo del eclipse, C3 (acaba la totalidad)
+  - duración de la totalidad
+  - altura y azimut aparentes (refractados) del Sol en cada instante
 
-Method: topocentric apparent separation of Sun and Moon centres compared with their
-angular radii. Totality while  sep < R_moon - R_sun  (umbral condition).
-Refraction is ignored for the contact times (it shifts Sun and Moon almost equally at
-the same altitude) but applied for the reported alt/az, which is what you actually see.
+Método: separación aparente topocéntrica entre los centros del Sol y la Luna,
+comparada con sus radios angulares. Hay totalidad mientras sep < R_luna - R_sol
+(condición umbral).
+
+La refracción NO se aplica a los instantes de contacto —desplaza al Sol y a la Luna
+casi lo mismo estando a la misma altura— pero sí a la altura y el azimut que se
+publican, que son los que uno ve de verdad.
 """
 import numpy as np
 from skyfield.api import Loader, wgs84
@@ -30,7 +33,7 @@ EARTH, SUN, MOON = _eph['earth'], _eph['sun'], _eph['moon']
 
 
 def _radii_and_sep(observer, t, limb_rot=None):
-    """Return (separation_deg, r_sun_deg, r_moon_deg) as arrays.
+    """Devuelve (separacion_deg, r_sol_deg, r_luna_deg) como arrays.
 
     Con `limb_rot` (una matriz de rotación de la Luna, ver `limb_rotation`) el radio
     lunar deja de ser una esfera y sale del PERFIL REAL del limbo, leído en el ángulo
@@ -73,19 +76,19 @@ def limb_rotation(t):
 
 
 def _g_total(observer, t, limb_rot=None):
-    """>0 while the observer is inside the umbra (total eclipse)."""
+    """>0 mientras el observador está dentro de la umbra (eclipse total)."""
     sep, r_sun, r_moon = _radii_and_sep(observer, t, limb_rot)
     return (r_moon - r_sun) - sep
 
 
 def _g_partial(observer, t):
-    """>0 while any part of the Sun is covered."""
+    """>0 mientras haya alguna parte del Sol tapada."""
     sep, r_sun, r_moon = _radii_and_sep(observer, t)
     return (r_moon + r_sun) - sep
 
 
 def _overlap_fraction(r_sun, r_moon, sep):
-    """Fraction of the solar disc area hidden by the lunar disc (circle-circle overlap)."""
+    """Fracción del ÁREA del disco solar tapada por el lunar (solape de dos círculos)."""
     if sep >= r_sun + r_moon:
         return 0.0
     if sep <= abs(r_moon - r_sun):
@@ -98,8 +101,9 @@ def _overlap_fraction(r_sun, r_moon, sep):
 
 
 def moon_offset(lat, lon, elev_m, t):
-    """Apparent (d_az, d_alt) of the Moon's centre relative to the Sun's, in degrees,
-    plus both angular radii. Used to draw the eclipsed Sun at true shape and scale."""
+    """Posición aparente (d_az, d_alt) del centro de la Luna respecto al del Sol, en
+    grados, más los dos radios angulares. Sirve para dibujar el Sol eclipsado con su
+    forma y su tamaño de verdad."""
     observer = EARTH + wgs84.latlon(lat, lon, elevation_m=elev_m)
     obs = observer.at(t)
     s = obs.observe(SUN).apparent()
@@ -113,8 +117,8 @@ def moon_offset(lat, lon, elev_m, t):
 
 
 def _bisect(observer, f, tjd_a, tjd_b, tol_s=0.02):
-    """Root-find in TT Julian date. Accepts the bracket in either order and
-    verifies that it really does contain a sign change."""
+    """Busca la raíz en fecha juliana TT. Acepta el intervalo en cualquier orden y
+    comprueba que de verdad contiene un cambio de signo."""
     tjd_lo, tjd_hi = (tjd_a, tjd_b) if tjd_a < tjd_b else (tjd_b, tjd_a)
     tol = tol_s / 86400.0
     flo = f(observer, _ts.tt_jd(tjd_lo))[0]
@@ -132,7 +136,8 @@ def _bisect(observer, f, tjd_a, tjd_b, tol_s=0.02):
 
 
 def circumstances(lat, lon, elev_m=0.0, coarse_step_s=30.0, use_limb=False):
-    """Full local circumstances. Returns dict (or partial-only / no-eclipse info).
+    """Circunstancias locales completas. Devuelve un dict (o el aviso de que ahí sólo
+    hay parcial, o de que no hay eclipse).
 
     `use_limb=False` por defecto, y no es pereza: el IGN y la NASA publican sus
     duraciones con limbo MEDIO por convenio, y quien mire esta web va a contrastar con
@@ -145,7 +150,7 @@ def circumstances(lat, lon, elev_m=0.0, coarse_step_s=30.0, use_limb=False):
     """
     observer = EARTH + wgs84.latlon(lat, lon, elevation_m=elev_m)
 
-    # Coarse scan of the window that covers Spain: 17:30-19:30 UTC
+    # Barrido grueso de la ventana que cubre España: 17:30-19:30 UTC
     t0 = _ts.utc(2026, 8, 12, 17, 30, 0)
     n = int(2 * 3600 / coarse_step_s) + 1
     tt_grid = t0.tt + np.arange(n) * (coarse_step_s / 86400.0)
@@ -155,11 +160,12 @@ def circumstances(lat, lon, elev_m=0.0, coarse_step_s=30.0, use_limb=False):
     g_tot = (r_moon - r_sun) - sep
     g_par = (r_moon + r_sun) - sep
 
-    # Maximum eclipse = minimum of (sep - r_moon - r_sun) normalised; use max of g_par
+    # Máximo del eclipse = mínimo de (sep - r_luna - r_sol) normalizado; se usa el
+    # máximo de g_par
     i_max = int(np.argmax(g_par))
     lo = max(i_max - 2, 0)
     hi = min(i_max + 2, n - 1)
-    # Golden-section-ish refinement of the maximum on g_par
+    # Refinado del máximo sobre g_par, tipo sección áurea
     a, b = tt_grid[lo], tt_grid[hi]
     for _ in range(60):
         m1 = a + (b - a) / 3.0
@@ -172,7 +178,7 @@ def circumstances(lat, lon, elev_m=0.0, coarse_step_s=30.0, use_limb=False):
 
     sep_m, rs_m, rm_m = _radii_and_sep(observer, _ts.tt_jd(tt_max))
     sep_m, rs_m, rm_m = sep_m[0], rs_m[0], rm_m[0]
-    # Eclipse magnitude = fraction of solar *diameter* covered
+    # Magnitud del eclipse = fracción del *diámetro* solar tapada
     magnitude = (rs_m + rm_m - sep_m) / (2.0 * rs_m)
     # Obscuration = fraction of the solar *disc area* covered -- the number that tracks
     # how dark it gets. Note it is NOT always below the magnitude: just outside the
@@ -190,7 +196,7 @@ def circumstances(lat, lon, elev_m=0.0, coarse_step_s=30.0, use_limb=False):
         tt_ = _ts.tt_jd(tt)
         app = observer.at(tt_).observe(SUN).apparent()
         alt_g, az, _ = app.altaz()                       # geometric
-        alt_r, _, _ = app.altaz('standard')              # with standard refraction
+        alt_r, _, _ = app.altaz('standard')              # con refracción estándar
         return alt_g.degrees, alt_r.degrees, az.degrees, tt_
 
     alt_g, alt_r, az, t_max = altaz(tt_max)
@@ -199,9 +205,9 @@ def circumstances(lat, lon, elev_m=0.0, coarse_step_s=30.0, use_limb=False):
         'max_alt_geom': alt_g, 'max_alt_app': alt_r, 'max_az': az,
     })
 
-    # Totality is decided at the instant of maximum eclipse (minimum separation),
-    # not from the coarse grid -- near the path edges totality can last only a few
-    # seconds and would fall between coarse samples.
+    # La totalidad se decide en el instante de máximo eclipse (separación mínima) y
+    # no sobre la rejilla gruesa: cerca del borde de la franja puede durar unos pocos
+    # segundos y caería entre dos muestras.
     # El limbo REAL decide los contactos. La orientación de la Luna se calcula una sola
     # vez, en el máximo: dentro del par de minutos que dura esto la cara que enseña no
     # cambia, y recalcularla en cada iteración de la bisección multiplicaría el coste
@@ -211,7 +217,7 @@ def circumstances(lat, lon, elev_m=0.0, coarse_step_s=30.0, use_limb=False):
 
     if gt(observer, _ts.tt_jd(tt_max))[0] <= 0:
         out['limb'] = rot is not None
-        return out  # partial only at this site
+        return out  # aquí sólo hay parcial
 
     # C2 and C3 must lie within +/-3 min of maximum for any eclipse on Earth.
     half = 180.0 / 86400.0

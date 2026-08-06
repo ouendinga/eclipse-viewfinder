@@ -1,23 +1,23 @@
 # -*- coding: utf-8 -*-
-"""Trees and buildings: the blind spot that elevation models share.
+"""Árboles y edificios: el punto ciego que comparten los modelos de elevación.
 
-The IGN's own eclipse visualiser states it plainly -- it uses GMTED2010 relief and
-"no se han tenido en cuenta ni las edificaciones ni el arbolado". Our SRTM is ten
-times finer, but it is still bare ground: a 20 m pine belt 300 m to the west is
-invisible to both, and it is exactly what ruins a 4-degree Sun.
+El propio visor de eclipses del IGN lo dice sin rodeos: usa el relieve GMTED2010 y
+«no se han tenido en cuenta ni las edificaciones ni el arbolado». Nuestro SRTM es
+diez veces más fino, pero sigue siendo suelo pelado: una hilera de pinos de 20 m a
+300 m al oeste es invisible para los dos, y es exactamente lo que arruina un Sol a 4°.
 
-So we ask OpenStreetMap what is standing in the sight line. For each viewpoint we
-query a narrow corridor toward the Sun's azimuth and turn buildings and woodland into
-an extra obstruction angle, which is then subtracted from the clearance.
+Así que se le pregunta a OpenStreetMap qué hay plantado en la línea de visión. Para
+cada mirador se consulta un corredor estrecho hacia el azimut del Sol y se convierten
+edificios y arbolado en un ángulo de obstrucción extra, que luego se resta del margen.
 
-Heights: buildings carry `height` or `building:levels` often enough to be useful;
-woodland almost never does, so a conservative default is applied and the result is
-FLAGGED as an assumption rather than presented as a measurement.
+Alturas: los edificios traen `height` o `building:levels` con la frecuencia suficiente
+para servir; el arbolado casi nunca, así que se aplica un valor conservador y el
+resultado se MARCA como suposición en vez de venderlo como una medida.
 
-Street View is deliberately not scraped. Automated download and analysis of Street
-View imagery needs a billed API key and runs against Google's terms; instead every
-point gets a one-click link pointing at the exact heading, so a human can check the
-thing a model cannot.
+Street View no se rasca a propósito. Bajar y analizar sus imágenes de forma automática
+exige una clave de API con factura y va contra los términos de Google; en su lugar
+cada punto lleva un enlace de un clic apuntando al rumbo exacto, para que una persona
+compruebe lo que ningún modelo puede.
 """
 import json
 import math
@@ -29,8 +29,8 @@ import urllib.request
 
 from .paths import DATA_DIR
 
-# Several public Overpass endpoints, rotated on failure: the main one rate-limits
-# hard (HTTP 429) well before a few hundred corridor queries are done.
+# Varios servidores públicos de Overpass, rotando al fallar: el principal corta por
+# tasa (HTTP 429) mucho antes de acabar unos cientos de consultas de corredor.
 OVERPASS_ENDPOINTS = [
     'https://overpass-api.de/api/interpreter',
     'https://overpass.kumi.systems/api/interpreter',
@@ -41,17 +41,18 @@ UA = 'eclipse-viewfinder/1.0 (https://github.com/ouendinga/eclipse-viewfinder)'
 CACHE_PATH = os.path.join(DATA_DIR, 'obstacles_cache.json')
 
 CORRIDOR_M = 2500.0      # how far ahead local clutter still matters at low Sun
-HALF_WIDTH_M = 90.0      # how far off the bearing something still intrudes
+HALF_WIDTH_M = 90.0      # cuánto se desvía del rumbo algo y sigue estorbando
 EYE_H = 1.6
 
-# Conservative default heights (metres). Documented as assumptions, not measurements.
+# Alturas por defecto, conservadoras (metros). Van documentadas como suposiciones,
+# nunca como medidas.
 DEFAULT_HEIGHTS = {
     'wood': 18.0,        # mature Iberian pine/oak canopy
     'forest': 18.0,
     'scrub': 3.0,
     'orchard': 6.0,
     'vineyard': 2.0,
-    'building': 8.0,     # only used when no height/levels tag exists
+    'building': 8.0,     # sólo se usa si no hay etiqueta height ni levels
 }
 LEVEL_HEIGHT_M = 3.0
 
@@ -210,7 +211,7 @@ def _ask(q, timeout, tries=4):
 
 
 def _bbox(lat, lon, az_deg, reach_m=CORRIDOR_M, pad_m=HALF_WIDTH_M):
-    """Bounding box covering the corridor from the point toward `az_deg`."""
+    """Rectángulo que cubre el corredor desde el punto hacia `az_deg`."""
     R = 6371000.0
     az = math.radians(az_deg)
     dlat = reach_m * math.cos(az) / R
@@ -283,7 +284,7 @@ def _height(tags):
 
 
 def _along(lat, lon, az_deg, tlat, tlon):
-    """Distance along the bearing and perpendicular offset, in metres."""
+    """Distancia a lo largo del rumbo y desviación perpendicular, en metros."""
     R = 6371000.0
     dy = math.radians(tlat - lat) * R
     dx = math.radians(tlon - lon) * R * math.cos(math.radians(lat))
@@ -295,15 +296,16 @@ def _along(lat, lon, az_deg, tlat, tlon):
 
 def check_batch(items, elev_lookup=None, batch=25, progress=None,
                 min_dist_m=40.0, timeout=45):
-    """Corridors for MANY viewpoints in one Overpass request.
+    """Corredores de MUCHOS miradores en una sola consulta a Overpass.
 
-    One request per point does not survive contact with the public Overpass instances:
-    they start refusing, every attempt then burns its full socket timeout, and the run
-    stops advancing altogether. A union of N corridor bboxes returns the same features
-    in a single, still-small response, which cuts ~1750 requests to ~70.
+    Una consulta por punto no sobrevive al contacto con los servidores públicos:
+    empiezan a rechazar, cada intento se come entero su tiempo de espera del socket y
+    la ejecución deja de avanzar. La unión de N rectángulos de corredor devuelve los
+    mismos elementos en una única respuesta, que sigue siendo pequeña, y baja de ~1750
+    peticiones a ~70.
 
-    `items` is a sequence of (lat, lon, az_deg, obs_elev). Returns a list of results
-    in the same order.
+    `items` es una secuencia de (lat, lon, az_deg, obs_elev). Devuelve los resultados
+    en el mismo orden.
     """
     cache = _load()
     out = [None] * len(items)
@@ -356,7 +358,7 @@ def check_batch(items, elev_lookup=None, batch=25, progress=None,
 
 
 def _query_multi(boxes, timeout=45, tries=3):
-    """One request, many bboxes. Same rotation and backoff as the single version."""
+    """Una petición, muchos rectángulos. Misma rotación y espera que la suelta."""
     parts = []
     for (s, w, n, e) in boxes:
         parts.append(f'way["building"]({s},{w},{n},{e});')
@@ -367,7 +369,7 @@ def _query_multi(boxes, timeout=45, tries=3):
 
 
 def _evaluate(elements, lat, lon, az_deg, obs_elev, elev_lookup, min_dist_m):
-    """Turn OSM features into the worst obstruction angle for one viewpoint."""
+    """Convierte los elementos de OSM en el peor ángulo de obstrucción del mirador."""
     h0 = obs_elev + EYE_H
     worst, n_seen = None, 0
     for el in elements:
@@ -383,8 +385,8 @@ def _evaluate(elements, lat, lon, az_deg, obs_elev, elev_lookup, min_dist_m):
             continue
         ground = (elev_lookup(c['lat'], c['lon']) if elev_lookup else obs_elev)
         ang = math.degrees(math.atan2(ground + h - h0, along))
-        # Below the horizontal it cannot hide anything: reporting "worst obstacle: a
-        # building at -13 deg" would be noise dressed as a finding.
+        # Por debajo de la horizontal no puede tapar nada: informar de «el peor
+        # obstáculo es un edificio a -13°» sería ruido disfrazado de hallazgo.
         if ang <= 0:
             continue
         n_seen += 1
@@ -400,11 +402,11 @@ def _evaluate(elements, lat, lon, az_deg, obs_elev, elev_lookup, min_dist_m):
 
 def check(lat, lon, az_deg, obs_elev, elev_lookup=None, use_cache=True,
           min_dist_m=40.0):
-    """Extra obstruction angle from OSM features in the sight line.
+    """Ángulo de obstrucción extra de los elementos de OSM en la línea de visión.
 
-    Returns a dict with the worst offender and the angle it subtends. `elev_lookup`
-    should map (lat, lon) -> ground elevation; without it, flat ground is assumed,
-    which understates obstacles uphill of the viewer.
+    Devuelve un diccionario con el peor culpable y el ángulo que abarca. `elev_lookup`
+    tiene que llevar de (lat, lon) a la altura del suelo; sin él se supone suelo
+    llano, lo que se queda corto con los obstáculos ladera arriba del observador.
     """
     key = f'{lat:.4f},{lon:.4f},{az_deg:.0f}'
     cache = _load()
@@ -574,10 +576,11 @@ def _query_raw(q, timeout=45, tries=3):
 
 
 def streetview_url(lat, lon, heading_deg, pitch=0):
-    """One-click Street View at the exact bearing to the Sun.
+    """Street View de un clic, con el rumbo exacto hacia el Sol.
 
-    A link, not a scrape: no API key, no terms to breach, and a human eye is better
-    at spotting a pine belt than anything automatable here.
+    Un enlace, no un rascado: sin clave de API, sin términos que incumplir, y un ojo
+    humano detecta una hilera de pinos mejor que nada de lo que se pueda automatizar
+    aquí.
     """
     return ('https://www.google.com/maps/@?api=1&map_action=pano'
             f'&viewpoint={lat:.6f},{lon:.6f}'

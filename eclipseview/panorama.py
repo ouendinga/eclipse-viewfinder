@@ -1,9 +1,10 @@
-"""Render a horizon panorama: the real terrain skyline in the WNW, with the Sun's
-track for 2026-08-12 drawn across it, so you can see exactly where the eclipsed Sun
-falls against the landscape.
+"""Dibuja el panorama del horizonte: la silueta real del terreno hacia el ONO, con
+la traza del Sol del 12-08-2026 pintada encima, para ver dónde cae exactamente el Sol
+eclipsado contra el paisaje.
 
-x axis = true azimuth (deg), y axis = apparent altitude (deg). Both the terrain and
-the Sun are in *apparent* (refracted) coordinates, so they are directly comparable.
+Eje x = azimut verdadero (grados), eje y = altura aparente (grados). Terreno y Sol van
+los dos en coordenadas *aparentes* (refractadas), así que se pueden comparar
+directamente.
 """
 import numpy as np
 from skyfield.api import load
@@ -14,20 +15,20 @@ _ts = load.timescale()
 
 
 def build(lat, lon, az_lo=262.0, az_hi=300.0, az_step=0.25, name=''):
-    """Compute everything needed for one panorama."""
+    """Calcula todo lo que hace falta para un panorama."""
     c = circumstances(lat, lon, float(elev_fine(lat, lon)[0]))
     az = np.arange(az_lo, az_hi + 1e-9, az_step)
     hz, bd, obs_elev = horizon_fine(lat, lon, az, return_distance=True)
 
-    # Sun track from an hour before C2 through sunset
+    # Traza del Sol desde una hora antes de C2 hasta la puesta
     t0 = _ts.utc(2026, 8, 12, 17, 20, 0)
     t1 = _ts.utc(2026, 8, 12, 19, 20, 0)
     saz, salt_g, salt_r, tt = sun_track(lat, lon, obs_elev, t0, t1, step_s=20.0)
 
-    # Interpolate terrain altitude at the Sun's azimuth along the track
+    # Se interpola la altura del terreno en el azimut del Sol a lo largo de la traza
     hz_at_sun = np.interp(saz, az, hz)
     visible = salt_r > hz_at_sun
-    # Sunset behind the real skyline = last moment the disc centre is above terrain
+    # Puesta tras la silueta real = último instante con el centro del disco arriba
     idx = np.where(visible)[0]
     set_az = float(saz[idx[-1]]) if idx.size else float('nan')
     set_utc = tt[idx[-1]].utc_iso(' ') if idx.size else None
@@ -44,7 +45,7 @@ def build(lat, lon, az_lo=262.0, az_hi=300.0, az_step=0.25, name=''):
                           terrain=float(np.interp(a[0], az, hz)),
                           local=f'{(h+2)%24:02d}:{m:02d}:{int(s):02d}'))
 
-    # Moon position relative to the Sun at maximum, for drawing the true crescent
+    # Posición de la Luna respecto al Sol en el máximo, para el creciente de verdad
     iso = c['max_utc']
     tmax = _ts.utc(2026, 8, 12, int(iso[11:13]), int(iso[14:16]), float(iso[17:19]))
     d_az, d_alt, r_sun, r_moon = moon_offset(lat, lon, obs_elev, tmax)
@@ -61,16 +62,16 @@ ALT_LO = -1.6
 
 
 def svg(p, width=820, height=352, pad_l=44, pad_b=32, pad_t=12, pad_r=10):
-    """Render the panorama as a self-contained SVG string.
+    """Devuelve el panorama como un SVG que se basta a sí mismo.
 
-    Both axes share the SAME angular scale, and every site is drawn on the same
-    window, so the panoramas are directly comparable and the Sun can be drawn at
-    its true angular diameter (0.53 deg).
+    Los dos ejes comparten LA MISMA escala angular, y todos los sitios se dibujan en
+    la misma ventana: así los panoramas se pueden comparar entre sí y el Sol se puede
+    pintar con su diámetro angular de verdad (0,53°).
     """
     az, hz = p['az'], p['hz']
     iw = width - pad_l - pad_r
     ih = height - pad_t - pad_b
-    deg_px = iw / (AZ_HI - AZ_LO)          # px per degree, identical on both axes
+    deg_px = iw / (AZ_HI - AZ_LO)          # px por grado, igual en los dos ejes
     alt_hi = ALT_LO + ih / deg_px
 
     def X(a):
@@ -79,7 +80,7 @@ def svg(p, width=820, height=352, pad_l=44, pad_b=32, pad_t=12, pad_r=10):
     def Y(v):
         return pad_t + (alt_hi - np.asarray(v)) * deg_px
 
-    def Yc(v):                              # clamped to the plot box
+    def Yc(v):                              # recortado a la caja del dibujo
         return np.clip(Y(v), pad_t, pad_t + ih)
 
     o = [f'<svg viewBox="0 0 {width} {height}" class="pano" '
@@ -90,7 +91,7 @@ def svg(p, width=820, height=352, pad_l=44, pad_b=32, pad_t=12, pad_r=10):
              f'width="{iw}" height="{ih}"/></clipPath>')
     o.append(f'<rect class="sky" x="{pad_l}" y="{pad_t}" width="{iw}" height="{ih}"/>')
 
-    # altitude gridlines
+    # rejilla de alturas
     v = 0
     while v <= alt_hi:
         y = float(Y(v))
@@ -98,7 +99,7 @@ def svg(p, width=820, height=352, pad_l=44, pad_b=32, pad_t=12, pad_r=10):
                  f'class="grid{" zero" if v == 0 else ""}"/>')
         o.append(f'<text x="{pad_l-7}" y="{y+3.5:.1f}" class="ylab">{v}&#176;</text>')
         v += 2
-    # azimuth gridlines
+    # rejilla de azimutes
     a = int(np.ceil(AZ_LO / 5.0) * 5)
     while a <= AZ_HI:
         x = float(X(a))
@@ -109,19 +110,19 @@ def svg(p, width=820, height=352, pad_l=44, pad_b=32, pad_t=12, pad_r=10):
         a += 5
 
     g = f' clip-path="url(#cp{id(p)%99999})"'
-    # terrain silhouette
+    # silueta del terreno
     pts = ' '.join(f'{x:.1f},{y:.1f}' for x, y in zip(X(az), Yc(hz)))
     o.append(f'<polygon class="terrain"{g} points="{pad_l},{pad_t+ih} {pts} '
              f'{pad_l+iw},{pad_t+ih}"/>')
 
-    # the Sun's path, as a faint trail plus discs every 10 minutes (true size)
+    # el camino del Sol: un rastro tenue más discos cada 10 minutos, a tamaño real
     sr = 0.2665 * deg_px
     m = (p['sun_az'] >= AZ_LO) & (p['sun_az'] <= AZ_HI)
     if m.any():
         tp = ' '.join(f'{x:.1f},{y:.1f}'
                       for x, y in zip(X(p['sun_az'][m]), Y(p['sun_alt'][m])))
         o.append(f'<polyline class="track"{g} points="{tp}"/>')
-    step = max(1, int(round(600 / 20)))     # track sampled every 20 s -> 10 min
+    step = max(1, int(round(600 / 20)))     # la traza va cada 20 s -> 10 min
     idx = np.arange(0, p['sun_az'].size, step)
     for i in idx:
         aa, vv = float(p['sun_az'][i]), float(p['sun_alt'][i])
@@ -131,9 +132,9 @@ def svg(p, width=820, height=352, pad_l=44, pad_b=32, pad_t=12, pad_r=10):
         o.append(f'<circle class="sunstep{" buried" if buried else ""}"{g} '
                  f'cx="{X(aa):.1f}" cy="{Y(vv):.1f}" r="{sr:.1f}"/>')
 
-    # The Sun at maximum eclipse, drawn at true angular size with the Moon's disc in
-    # its real relative position -- so the crescent you see here is the crescent you
-    # would actually see from this spot.
+    # El Sol en el máximo, a tamaño angular real y con el disco de la Luna en su
+    # posición relativa de verdad: el creciente que sale aquí es el que verías con los
+    # ojos desde ese sitio.
     if p['marks']:
         mk = p['marks'][1] if len(p['marks']) > 1 else p['marks'][0]
         total = p['circ']['total']
@@ -146,8 +147,8 @@ def svg(p, width=820, height=352, pad_l=44, pad_b=32, pad_t=12, pad_r=10):
         if total:
             o.append(f'<circle class="corona"{g} cx="{x:.1f}" cy="{y:.1f}" '
                      f'r="{rs*2.6:.1f}"/>')
-        # If the skyline is above the Sun at this instant, the disc is drawn where it
-        # *would* be, dimmed, so it is obvious that the ground is in the way.
+        # Si en ese instante la silueta está por encima del Sol, el disco se dibuja
+        # donde *estaría*, apagado, para que se vea que el terreno se interpone.
         hidden = mk['alt'] < mk['terrain']
         hc = ' hidden' if hidden else ''
         o.append(f'<circle class="sundisc{" tot" if total else ""}{hc}"{g} '
@@ -166,8 +167,9 @@ def svg(p, width=820, height=352, pad_l=44, pad_b=32, pad_t=12, pad_r=10):
                  f'x2="{x:.1f}" y2="{y-halo:.1f}"/>')
         o.append(f'<text x="{x:.1f}" y="{ly:.1f}" class="mlab">{lab}</text>')
 
-        # Magnified inset: at true scale the uncovered sliver is sub-pixel, so show
-        # the same Sun-Moon geometry blown up. Same numbers, readable shape.
+        # Recuadro ampliado: a escala real la uñita que queda sin tapar mide menos de
+        # un píxel, así que se repite la misma geometría Sol-Luna en grande. Los
+        # mismos números, con una forma que se ve.
         R = 44.0
         mag = R / rs
         cx, cy = pad_l + R + 16, pad_t + R + 16
