@@ -49,6 +49,31 @@ se marca **«AL BORDE · RIESGO ALTO»** con tooltip: sesgo de ±3 s, no se mode
 lunar, podrían ser 0 s; para un cazador de eclipses compensa, para un plan en familia
 suele ser mejor un parcial casi seguro.
 
+## 2026-08-06 — El limbo lunar es la SEGUNDA opinión, no el titular ✅
+Se modela el perfil real del borde de la Luna (topografía LOLA de la sonda LRO a 16
+px/grado + la libración del día desde los núcleos NAIF `moon_pa_de421`). Para este
+eclipse el borde va de **1.732,17 a 1.742,58 km**, 10,4 km de desnivel, y su media
+(1.736,69) cae encima de nuestra esfera calibrada (1.736,0) y del convenio de Espenak
+(1.736,65): tres caminos independientes que coinciden.
+**Pero la duración publicada NO cambia.** El IGN y la NASA publican con limbo medio por
+convenio, y quien mire la web va a contrastar con el IGN: cambiar el titular por un
+número que no cuadra con el suyo es peor servicio aunque el modelo sea más fino. Además
+no hay ninguna referencia publicada CON limbo corregido contra la que validar, así que
+no se vende como «más correcto». `circumstances(use_limb=False)` es el defecto y hay un
+test que salta si alguien lo cambia.
+Lo que aporta el limbo es la respuesta del filo: **¿hay corona o no?** Y el resultado va
+contra lo que suponíamos: en el borde **alarga** la totalidad. Caudete de las Fuentes
+pasa de 1,5 s a 13,4 s, O Porto de Corme de 9,9 a 24,6. La causa es concreta: en el
+ángulo por donde asoma el Sol hay una montaña **+2,1 km sobre la media** del borde.
+Durante meses le dijimos a esa gente «podrían ser 0 s»; era prudente y era falso.
+
+## 2026-08-06 — Ordenar por totalidad que confirman los DOS modelos ✅
+Una totalidad de 5 s se listaba por delante de un parcial del 99,4 % con mucho mejor
+margen, sólo por ser totalidad. Ahora encabeza sólo la que ven la esfera calibrada **y**
+el perfil del limbo. La que ve uno solo baja con los parciales y lleva su aviso. Y donde
+los dos difieren en más de 5 s, la chapa enseña el **rango** («TOTALIDAD 13–24 s») en
+vez de un número redondo: fingir precisión donde no la hay era el problema de fondo.
+
 ## 2026-08-05 — El radio lunar se calibra, no se copia ✅
 Las duraciones salían largas y el sitio lo declaraba como «+2–3 %». Midiendo contra las
 cuatro referencias publicadas, el sesgo **no era un porcentaje**: eran entre +2,4 y

@@ -37,8 +37,15 @@ Lo calculado está bien; lo que falla es cómo se presenta y qué falta comproba
       de un parcial del 99,4 % con mejor margen. Se avisa en el texto, pero conviene
       revisar si el orden debería penalizar las duraciones bajo ~30 s, donde el error
       del cálculo y el perfil del limbo lunar pesan mucho.
-- [ ] **Perfil real del limbo lunar**: mueve los contactos algunos segundos, y justo en
-      el borde de la franja es lo que decide entre 6 s y nada.
+- [x] **Perfil real del limbo lunar**: hecho (`limb.py`, LOLA + NAIF). Es la segunda
+      opinión, no el titular — ver `decisions.md` 2026-08-06.
+- [ ] **Desempate cuando el margen satura.** En el oeste el **63 %** de los puntos tiene
+      el margen por encima del tope de 8° de la puntuación de `select()`, así que ese
+      criterio deja de distinguir y decide la geometría pura: por eso los puntos salen
+      en cuadrícula en la meseta. Podría estar eligiendo un punto sin acceso teniendo
+      uno igual de bueno con carretera al lado. **Cambia qué puntos se publican**: obliga
+      a rehacer la selección (~40 min de horizontes) y a volver a pasar OSM por los
+      puntos nuevos (una tanda de madrugada).
 - [x] **`Sa Cuina del Bisbe` (39,16/2,92)**: confirmado que es tierra. Tiene una pista
       (`track`, firme de tierra) a 1.135 m, así que es un islote con acceso a pie, no un
       bajo submarino. Se queda.

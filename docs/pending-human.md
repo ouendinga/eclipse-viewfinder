@@ -1,6 +1,6 @@
 # Tareas que requieren acción humana — eclipse-viewfinder
 
-Actualizado: 2026-08-05
+Actualizado: 2026-08-06
 
 ## Decisiones pendientes
 
@@ -10,14 +10,16 @@ Actualizado: 2026-08-05
       legales por transferencias) y Cloudflare Web Analytics (su única ventaja es un
       límite que no se va a rozar).
 
-- [ ] **Comprobar Web Analytics después del próximo despliegue.** El proyecto ya trae
-      `webAnalytics: {id: sN0eYCVt4ckH2TElaDfAmQ5Y8}` en su configuración (consultado por
-      API el 2026-08-05), pero `https://eclipse.alvarosolis.dev/_vercel/insights/script.js`
-      responde **404**, así que no se puede dar por activa. La página en producción
-      tampoco lleva todavía el script.
-      Tras el `redeploy.sh`: si el script sigue dando 404, hay que entrar a
-      `vercel.com/ouendingas-projects/eclipse-viewfinder/analytics` y pulsar **Enable**.
-      Las visitas que trajo WhatsApp ya se perdieron y no son recuperables.
+- [x] **Web Analytics del eclipse: ACTIVA y contando** (6 visitantes, 7 páginas vistas
+      al 2026-08-06). Hizo falta pulsar Enable en el panel **y** volver a desplegar: la
+      ruta `/_vercel/insights/*` no se provisiona hasta el primer despliegue posterior.
+      Y ojo al comprobarlo: el script de Vercel se apaga solo en navegadores
+      automatizados (mira `navigator.webdriver`), así que con Playwright headless parece
+      que no funciona. Hay que probarlo con navegador de verdad.
+
+- [x] **Web Analytics del portfolio (alvarosolis.dev)**: activada, el endpoint responde
+      200. Y sus 6 vulnerabilidades de dependencias, resueltas en otra conversación
+      (`npm audit --omit=dev` da 0).
 
 - [ ] **Averiguar si los 50.000 eventos/mes del plan Hobby son por proyecto o por cuenta.**
       Hay **cinco** proyectos con analítica en la cuenta (`eclipse-viewfinder`,
