@@ -10,6 +10,13 @@ Dos reglas que vienen de la línea de comandos:
     libre convertido en coordenada;
   * el radio tiene tope, porque «10.000 km» devolvería el país entero y no
     significaría nada.
+
+Por qué el JavaScript está escrito así y no con `const`, flechas y módulos: va
+incrustado en la página, sin empaquetador ni paso de compilación, y sin ninguna
+dependencia. Es ES5 apretado a propósito —`var` agrupados, funciones de una línea, sin
+espacios de sobra— porque cada carácter viaja en el HTML de todas las visitas y aquí no
+hay minificador que lo arregle después. Escribirlo cómodo costaría kilobytes en cada
+carga para ahorrarle un rato a quien lo lea una vez.
 """
 
 MAX_RADIUS_KM = 100
