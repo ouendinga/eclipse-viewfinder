@@ -348,14 +348,20 @@ def script(max_radius=MAX_RADIUS_KM):
   }
   // Un punto SIN totalidad no puede leerse "100,0%": 99,951 redondeado a una decimal
   // da 100,0 y, pegado a la palabra "parcial", parece un fallo del cálculo justo en
-  // los puntos donde más se mira. Sólo cuando el redondeo satura se trunca en vez de
-  // redondear —hacia abajo, que nunca promete de más—, y truncar no puede llegar a
-  // 100 porque el valor es menor que 100.
+  // los puntos donde más se mira.
+  //
+  // La regla es la misma que la de i18n.obscuration, que ya la aplicaba en los
+  // informes: se añaden decimales hasta que el número se queda por debajo de 100. Si
+  // aquí se truncara, el informe y la web dirían cosas distintas del mismo punto
+  // (99,95% frente a 99,9%), que es peor que cualquiera de las dos por separado.
   function obscTxt(p,d){
     d=(d==null)?1:d;
-    var f=Math.pow(10,d);
-    if(!p.total && Math.round(p.obsc*f)/f>=100) return n(Math.floor(p.obsc*f)/f,d);
-    return n(p.obsc,d);
+    if(p.total) return n(p.obsc,d);
+    for(var k=d;k<=3;k++){
+      var s=n(p.obsc,k);
+      if(parseFloat(s.replace(',','.'))<100) return s;
+    }
+    return '>'+n(99.999,3);
   }
 
   // Accesibilidad a partir de las etiquetas de OpenStreetMap. Lo que NO se puede es

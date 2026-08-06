@@ -518,8 +518,11 @@ class TestPartialNeverReadsAsHundred(unittest.TestCase):
     def test_every_render_goes_through_the_guard(self):
         from eclipseview import finder_ui
         src = finder_ui.script()
-        # la única llamada cruda que queda es la del propio guardia
-        self.assertEqual(src.count('n(p.obsc'), 1,
+        # Fuera del propio guardia no puede quedar ni una llamada cruda: si alguien
+        # añade otro sitio donde se pinte la obscuración, tiene que pasar por aquí.
+        i = src.index('function obscTxt(')
+        fuera = src[:i] + src[src.index('\n  }', i):]
+        self.assertNotIn('n(p.obsc', fuera,
                          'la obscuración se pinta con obscTxt(), nunca con n(p.obsc,…)')
         self.assertGreaterEqual(src.count('obscTxt(p,'), 5,
                                 'los cinco sitios que pintan obscuración usan el guardia')
@@ -551,16 +554,18 @@ class TestPartialNeverReadsAsHundred(unittest.TestCase):
         self.assertEqual(salida.returncode, 0, salida.stderr)
         textos = _json.loads(salida.stdout)
         for v, textos_v in zip(casos, textos):
-            for d, t in zip((1, 2), textos_v):
-                leido = float(t.replace(',', '.'))
+            for t in textos_v:
+                # el ">" es la salida honrada cuando ni con tres decimales baja de 100
+                leido = float(t.lstrip('>').replace(',', '.'))
                 self.assertLess(leido, 100.0,
                                 f'{v}% sin totalidad se pinta «{t}%», y eso es un 100')
-                if round(v, d) >= 100.0:      # sólo donde el redondeo saturaba
-                    self.assertLessEqual(leido, v,
-                                         'ahí trunca: nunca promete más de lo medido')
-        # y fuera del filo se sigue redondeando, que es lo de siempre
-        self.assertEqual(textos[4], ['92,4', '92,38'],
-                         'un valor corriente no cambia de formato')
+        # Y, sobre todo, la web tiene que decir lo MISMO que el informe. Que las dos
+        # nunca lleguen a 100 no basta: si una trunca y la otra añade decimales, el
+        # mismo punto sale como 99,9% en un sitio y 99,95% en el otro, y eso destruye
+        # la confianza igual que el 100,0% que vinimos a quitar.
+        for v, textos_v in zip(casos, textos):
+            self.assertEqual(textos_v[0] + '%', i18n.obscuration('es', v, False),
+                             f'la web y el informe discrepan en {v}%')
 
     def test_the_dataset_still_exercises_the_guard(self):
         """Si un día ningún punto satura, este test avisa de que el guardia dejó de

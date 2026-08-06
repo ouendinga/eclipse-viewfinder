@@ -54,10 +54,16 @@ desarrollo:
    publican con limbo medio y la gente contrasta con ellos.
 6. **«100,0% parcial».** 97 de los 1.456 puntos tienen entre 99,951 % y 99,999 % del
    disco oculto, y redondeados a una decimal se pintaban como `100,0% parcial`, que
-   leído en frío es una contradicción justo en los puntos del filo. Ahora, y sólo
-   cuando el redondeo satura, se trunca hacia abajo. El test **ejecuta el JS que se
-   publica** con `node`, no una copia en Python: una reimplementación aprobaría
-   aunque el navegador hiciera otra cosa.
+   leído en frío es una contradicción justo en los puntos del filo. La regla ya
+   existía en `i18n.obscuration` para los informes —añadir decimales hasta bajar de
+   100— pero el buscador web no la usaba. Ahora la comparten.
+
+   El test **ejecuta con `node` el JavaScript que se publica**, no una copia en
+   Python: una reimplementación aprobaría aunque el navegador hiciera otra cosa. Y
+   comprueba las dos cosas: que ninguna de las dos llega a 100, y que **dicen lo
+   mismo**. Que las dos evitaran el 100 por caminos distintos dejaría al informe
+   diciendo 99,95 % y a la web 99,9 % del mismo punto, que es tan malo como el
+   problema original.
 
 ## Lo que sí se comprueba ya (y antes no)
 
