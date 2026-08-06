@@ -6,6 +6,3 @@ __pycache__/
 *.pyc
 *.egg-info/
 .DS_Store
-
-# notas de trabajo locales
-CLAUDE.md
