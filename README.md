@@ -2,6 +2,12 @@
 
 **Desde dónde ver un eclipse, teniendo en cuenta el terreno de verdad.**
 
+### → Funcionando, sin instalar nada: **[eclipse.alvarosolis.dev](https://eclipse.alvarosolis.dev)**
+
+Ahí están los **1.456 miradores ya calculados** para el eclipse del 12 de agosto de
+2026: pones tu pueblo y el radio, y salen los puntos concretos con su horizonte real
+dibujado. Lo de abajo es el motor que los produce.
+
 Los mapas de eclipse te dicen *dónde cae la sombra*. No te dicen si desde ese punto
 vas a poder ver el Sol. Cuando el Sol está bajo —y en el eclipse del **12 de agosto
 de 2026** sobre España está entre 2° y 12°— el sitio no lo decide el pueblo: lo decide
