@@ -24,6 +24,11 @@ CSS = """
 .fld input[type=text]{background:var(--ground);border:1px solid var(--line);
   color:var(--text);padding:10px 12px;font:15px var(--sans);width:100%}
 .fld input[type=text]:focus{outline:2px solid var(--sun);outline-offset:-1px}
+.fclear{flex:0 0 auto;background:none;border:1px solid var(--line);color:var(--muted);
+  padding:10px 14px;font:600 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;
+  cursor:pointer}
+.fclear:hover{border-color:var(--sun);color:var(--sun)}
+.fclear:focus-visible{outline:2px solid var(--sun);outline-offset:2px}
 .rad{flex:1 1 220px}
 .rad .row{display:flex;align-items:center;gap:10px}
 .rad input[type=range]{flex:1;accent-color:var(--sun)}
@@ -107,6 +112,7 @@ def html(max_radius=MAX_RADIUS_KM, default_radius=DEFAULT_RADIUS_KM):
           <span class="v" id="rv">{default_radius} km</span>
         </div>
       </div>
+      <button type="button" class="fclear" id="fclear" hidden>Empezar de nuevo</button>
     </div>
     <p class="fstatus" id="fstatus">Escribe una localidad y elígela de la lista.</p>
     <div class="fres" id="fres"></div>
@@ -122,7 +128,9 @@ def script(max_radius=MAX_RADIUS_KM):
   var DATA=null, ORIGIN=null, TIMER=null, ABORT=null;
   var q=document.getElementById('q'), sugg=document.getElementById('sugg'),
       r=document.getElementById('r'), rv=document.getElementById('rv'),
-      st=document.getElementById('fstatus'), res=document.getElementById('fres');
+      st=document.getElementById('fstatus'), res=document.getElementById('fres'),
+      clr=document.getElementById('fclear');
+  var INICIAL='Escribe una localidad y elígela de la lista.';
 
   function esc(s){var d=document.createElement('div');d.textContent=s==null?'':s;
     return d.innerHTML;}
@@ -133,8 +141,9 @@ def script(max_radius=MAX_RADIUS_KM):
 
   fetch('points.json').then(function(x){return x.json();}).then(function(j){
     DATA=j;
-    st.innerHTML='<b>'+j.meta.n+' miradores</b> ya calculados para este eclipse. '+
+    INICIAL='<b>'+j.meta.n+' miradores</b> ya calculados para este eclipse. '+
       'Escribe una localidad y elígela de la lista.';
+    if(!ORIGIN) st.innerHTML=INICIAL;
     var p=new URLSearchParams(location.search);
     if(p.get('lat')&&p.get('lon')){
       ORIGIN={lat:parseFloat(p.get('lat')),lon:parseFloat(p.get('lon')),
@@ -224,8 +233,36 @@ def script(max_radius=MAX_RADIUS_KM):
     });
   }
 
+  // Volver al principio de verdad. Antes no había manera: borrabas el texto y los
+  // resultados del pueblo anterior seguían ahí, y la búsqueda se quedaba pegada en la
+  // dirección (?lat=…&n=…), así que recargar tampoco servía.
+  function limpiar(){
+    ORIGIN=null;
+    q.value=''; sugg.classList.remove('on'); sugg.innerHTML='';
+    res.innerHTML=''; st.innerHTML=INICIAL;
+    clr.hidden=true;
+    // las columnas de distancia vuelven a su estado neutro
+    [].forEach.call(document.querySelectorAll('.dcol[data-lat]'),function(el){
+      var v=el.querySelector('.v');
+      if(v){ v.textContent='—'; var k=el.querySelector('.k');
+             if(k) k.textContent='distancia'; }
+      else el.textContent='—';
+    });
+    [].forEach.call(document.querySelectorAll('th.dcol'),function(el){
+      el.textContent='km hasta el punto'; });
+    var u=new URL(location);
+    ['lat','lon','n','r'].forEach(function(k){ u.searchParams.delete(k); });
+    history.replaceState(null,'',u.pathname+u.search+u.hash);
+    q.focus();
+  }
+  clr.addEventListener('click',limpiar);
+  // borrar el texto a mano equivale a empezar de nuevo: dejar resultados de un pueblo
+  // que ya no está escrito es lo que confundía
+  q.addEventListener('input',function(){ if(!q.value.trim()&&ORIGIN) limpiar(); });
+
   function run(){
     if(!DATA||!ORIGIN) return;
+    clr.hidden=false;
     retag();
     var rad=Math.min(+r.value,MAXR);
     var hits=DATA.points.map(function(p){
