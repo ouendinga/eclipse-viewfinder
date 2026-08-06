@@ -250,6 +250,30 @@ class TestOffshoreIsNotRecommended(unittest.TestCase):
         self.assertEqual(kept[0]['place'], 'Gorliz, Bizkaia, Euskadi')
 
 
+class TestOpenSeaNeedsThreeSignals(unittest.TestCase):
+    """Cada señal por separado tiene falsos positivos que costó encontrar; el test los
+    fija para que nadie simplifique la regla creyendo que sobra una."""
+
+    def _p(self, elev, near_m, acc_ok=True):
+        return dict(lat=40.0, lon=0.0, elev=elev, acc_ok=acc_ok,
+                    acc={'near': ({'m': near_m} if near_m is not None else None)})
+
+    def test_open_sea_is_caught(self):
+        # Escala d'Espanya: nivel del mar, sin vía, sin relieve
+        self.assertTrue(recommend.is_at_sea(self._p(2, None), relief=7.0))
+
+    def test_the_flat_delta_survives_because_it_has_a_road(self):
+        # Delta de l'Ebre: 1 m de altitud y 2 m de relieve en 8 km, pero con carretera
+        self.assertFalse(recommend.is_at_sea(self._p(1, 41), relief=2.0))
+
+    def test_a_coastal_dwelling_survives_because_of_the_hills_behind(self):
+        # Foz: 1 m, sin vía encontrada, pero 368 m de monte a 8 km
+        self.assertFalse(recommend.is_at_sea(self._p(1, None), relief=368.0))
+
+    def test_a_summit_is_never_at_sea(self):
+        self.assertFalse(recommend.is_at_sea(self._p(1434, None), relief=0.0))
+
+
 class TestStreetViewNeedsARoad(unittest.TestCase):
     """Street View se graba desde la vía: sin asfalto cerca el enlace abre una pantalla
     negra. Ya pasó en producción una vez, y volvió a pasar cuando enrich_obstacles

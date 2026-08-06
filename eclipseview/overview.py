@@ -20,6 +20,8 @@ from .report import esc, _num, _margin_class, _td_class, site_note
 from .style import CSS
 
 LANG = 'es'
+# Absoluta a propósito: las tarjetas sociales no resuelven rutas relativas.
+SITE_URL = 'https://eclipse.alvarosolis.dev'
 D = lambda v, s=True: i18n.deg(LANG, v, 2, s)        # noqa: E731
 N = lambda v, d=0: i18n.number(LANG, v, d)           # noqa: E731
 
@@ -226,6 +228,14 @@ def render(data, finder_html='', finder_css='', finder_js=''):
     cd_html = countdown.html(t2s[0]) if t2s else ''
     hora_totalidad = int(t2s[0][:2]) if t2s else 20
 
+    # cuántos miradores se dibujan en el mapa: sale del dataset, no escrito a mano
+    import json as _json
+    from .paths import DATA_DIR as _DD
+    _pp = os.path.join(_DD, 'points.json')
+    # con separador de millares como el resto de la página; i18n.number no lo pone
+    n_pts = (f"{len(_json.load(open(_pp))['points']):,}".replace(',', '.')
+             if os.path.exists(_pp) else '—')
+
     alt_hi = max(r['alt_start'] for r in s.values())
     alt_lo = min(r['alt'] for r in s.values())
     az_lo = min(r['az'] for r in s.values())
@@ -304,12 +314,17 @@ def render(data, finder_html='', finder_css='', finder_js=''):
   <h2>Dónde cae la franja</h2>
   <div class="mapbox">{map_svg}</div>
   <div class="legendrow">
-    <span><i style="background:#ff9b3d"></i>línea central</span>
-    <span><i style="background:#ffd9a0"></i>franja de totalidad</span>
+    <span style="color:#ff9b3d"><i class="line"></i>línea central</span>
+    <span style="color:#ffd9a0"><i class="area" style="background:#ffd9a033"></i>franja
+      de totalidad</span>
     <span><i style="background:#8ce99a"></i>buen margen</span>
     <span><i style="background:#ffe066"></i>aceptable</span>
     <span><i style="background:#ff5c5c"></i>bloqueado</span>
   </div>
+  <p class="caption">Cada punto es uno de los <b>{n_pts} miradores recomendados</b>, no
+  una muestra del terreno: por eso casi ninguno sale bloqueado — ya están elegidos por
+  tener buen horizonte. Los que sí lo están son los que el chequeo de árboles y
+  edificios de OpenStreetMap estropeó después de elegirlos.</p>
   <p class="caption">Relieve dibujado con el mismo modelo de elevación
   ({sources.cite('srtm')}) que uso para los cálculos. Los bordes los he resuelto por
   bisección con el motor de eclipses, no interpolando: sobre España la sombra mide
@@ -417,6 +432,23 @@ def render(data, finder_html='', finder_css='', finder_js=''):
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Eclipse Viewfinder — desde dónde ver el eclipse del 12 de agosto de 2026</title>
 <meta name="description" content="Desde dónde ver el eclipse total del 12 de agosto de 2026 en España teniendo en cuenta el terreno real, los árboles y los edificios. El Sol estará entre 2° y 12°: una loma cercana lo tapa.">
+<!-- Tarjeta social: sin esto WhatsApp enseña el dominio pelado tres veces y el enlace
+     parece spam. La imagen se genera con ./ogcard.sh a partir del mapa del propio sitio.
+     Las URL tienen que ser ABSOLUTAS: WhatsApp y Twitter no resuelven rutas relativas. -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="{SITE_URL}/">
+<meta property="og:site_name" content="Eclipse Viewfinder">
+<meta property="og:locale" content="es_ES">
+<meta property="og:title" content="{esc(n_pts)} miradores para el eclipse del 12 de agosto">
+<meta property="og:description" content="El Sol estará entre 2° y 11° sobre el horizonte: una loma a 3 km te lo tapa. Cruzo la geometría del eclipse con el terreno real a 30 m, los árboles y los edificios, y te digo desde qué punto exacto se ve.">
+<meta property="og:image" content="{SITE_URL}/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Mapa de la franja de totalidad sobre España con los miradores calculados">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{esc(n_pts)} miradores para el eclipse del 12 de agosto">
+<meta name="twitter:description" content="El Sol estará entre 2° y 11°: una loma a 3 km te lo tapa. Terreno real a 30 m, árboles y edificios.">
+<meta name="twitter:image" content="{SITE_URL}/og.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%2213%22 fill=%22%23e08a2e%22/%3E%3Ccircle cx=%2221%22 cy=%2213%22 r=%2213%22 fill=%22%230e131a%22/%3E%3C/svg%3E">
 <style>{CSS}
 {finder_css}

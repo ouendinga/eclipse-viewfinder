@@ -71,8 +71,15 @@ section:last-of-type{border-bottom:0}
 .caption{font-size:13px;color:var(--muted);margin:9px 0 0;max-width:70ch}
 .legendrow{display:flex;flex-wrap:wrap;gap:16px;margin:12px 0 0;
   font:500 12px var(--mono);color:var(--muted)}
+/* El símbolo dice QUÉ es la cosa, no solo de qué color: un punto para los puntos, una
+   raya para la línea central y un rectángulo para la franja, que es una zona. Con todo
+   redondo, la leyenda decía que la franja era un punto. */
 .legendrow i{display:inline-block;width:10px;height:10px;border-radius:50%;
   margin-right:6px;vertical-align:-1px}
+.legendrow i.line{width:22px;height:0;border-radius:0;border-top:2px dashed currentColor;
+  background:none !important;vertical-align:3px}
+.legendrow i.area{width:20px;height:11px;border-radius:0;border:1px solid currentColor;
+  vertical-align:-1px}
 .site{border:1px solid var(--line);background:var(--panel);margin:20px 0 0}
 .site.hero{border-color:var(--sun)}
 .site.bad{border-color:var(--bad)}

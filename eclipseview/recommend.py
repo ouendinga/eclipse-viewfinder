@@ -272,6 +272,11 @@ def check_invariants(points):
     if mar:
         fallos.append(f'{len(mar)} puntos sin tierra confirmada (p. ej. '
                       f'{mar[0]["lat"]:.3f},{mar[0]["lon"]:.3f})')
+    ahogados = [p for p in points if is_at_sea(p)]
+    if ahogados:
+        fallos.append(f'{len(ahogados)} puntos en mar abierto '
+                      f'(p. ej. {ahogados[0]["lat"]:.3f},{ahogados[0]["lon"]:.3f} — '
+                      f'{ahogados[0].get("place")})')
     malos_sv = [p for p in points if p.get('sv') and not _sv_allowed(p)]
     if malos_sv:
         fallos.append(f'{len(malos_sv)} enlaces de Street View sin carretera cerca')
@@ -280,6 +285,42 @@ def check_invariants(points):
         fallos.append(f'los índices no son correlativos (1..{len(points)}): '
                       f'van de {idx[0]} a {idx[-1]}')
     return fallos
+
+
+SEA_RELIEF_KM = 8.0        # radio en el que se busca relieve
+SEA_RELIEF_M = 100.0       # por debajo de esto no hay costa que valga
+
+
+def is_at_sea(p, relief=None):
+    """¿Este punto está en mar abierto? Tres condiciones a la vez, y hacen falta las tres.
+
+    El topónimo solo no basta: 39,890/0,670 está a 57 km de la costa de Castellón, sobre
+    el bajo submarino «Escala d'Espanya», y Nominatim le devolvió el municipio.
+    «Sin carretera cerca» solo tampoco: 43,610/-7,280 es una vivienda aislada en la costa
+    de Lugo a la que Overpass no le encontró vía, y es tierra de verdad.
+    Y «sin relieve alrededor» solo, menos: el Delta de l'Ebre es de los mejores puntos
+    del país y tiene 2 m de desnivel en 8 km a la redonda.
+
+    Juntas sí: a nivel del mar, sin una sola vía en kilómetros y sin nada que levante el
+    terreno en 8 km. El Delta se salva por la carretera a 41 m; Foz, por los 368 m de
+    monte que tiene detrás.
+    """
+    if (p.get('elev') or 0) > 3 or not p.get('acc_ok'):
+        return False
+    if ((p.get('acc') or {}).get('near') or {}).get('m') is not None:
+        return False
+    if relief is None:
+        relief = _relief_around(p['lat'], p['lon'])
+    return relief < SEA_RELIEF_M
+
+
+def _relief_around(lat, lon, km=SEA_RELIEF_KM, n=11):
+    import numpy as np
+    from .terrain import elev_fine
+    dlat = km / 111.2
+    dlon = km / (111.32 * np.cos(np.radians(lat)))
+    return max(float(elev_fine(lat + i * dlat, lon + j * dlon)[0])
+               for i in np.linspace(-1, 1, n) for j in np.linspace(-1, 1, n))
 
 
 def _sv_allowed(p):
