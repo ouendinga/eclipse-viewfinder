@@ -19,7 +19,8 @@ from .analysis import evaluate, km, search_area
 from .paths import REPORTS_DIR, ensure
 from .style import CSS
 
-# Places worth having ready: on or near the path, plus the big cities people will try.
+# Sitios que compensa tener listos: dentro o cerca de la franja, más las ciudades
+# grandes que la gente va a probar.
 PRESET = [
     # query,                        radius, note
     ('Luarca, Asturias', 45),
@@ -69,7 +70,7 @@ def build_one(query, radius, lang='es', top=5, min_clear=1.5, progress=None):
         r['place'] = gazetteer.reverse(r['lat'], r['lon'], lang=lang)
         r['dist'] = float(km(r['lat'], r['lon'], origin['lat'], origin['lon']))
         rows.append(r); kept += 1
-    # always show the origin itself: "can I see it from the town?" is the first question
+    # el origen siempre se enseña: «¿se ve desde el pueblo?» es la primera pregunta
     home = evaluate(origin['lat'], origin['lon'], label=f'{origin["name"]} (el pueblo)')
     home['place'] = label
     home['dist'] = 0.0
@@ -170,11 +171,12 @@ Hecho por <a href="https://alvarosolis.dev">Álvaro Solís</a>.</p></footer>
 
 
 def build(out_dir=None, lang='es', preset=None, progress=None, with_overview=True):
-    """Build the site: one page with everything, plus the points dataset it searches.
+    """Construye el sitio: una página con todo, más el conjunto de puntos que busca.
 
-    The 16 static per-town pages are gone: with the precomputed points shipped as data,
-    any town is answered client-side, so keeping frozen copies of a few of them would
-    only mean two places to keep in sync.
+    Las 16 páginas estáticas por pueblo ya no están: con los puntos precalculados
+    publicados como datos, cualquier pueblo se responde en el navegador, así que
+    guardar copias congeladas de unos pocos sólo daría dos sitios que mantener
+    sincronizados.
     """
     import shutil
     from .paths import DATA_DIR

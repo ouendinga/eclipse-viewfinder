@@ -180,10 +180,10 @@ def circumstances(lat, lon, elev_m=0.0, coarse_step_s=30.0, use_limb=False):
     sep_m, rs_m, rm_m = sep_m[0], rs_m[0], rm_m[0]
     # Magnitud del eclipse = fracción del *diámetro* solar tapada
     magnitude = (rs_m + rm_m - sep_m) / (2.0 * rs_m)
-    # Obscuration = fraction of the solar *disc area* covered -- the number that tracks
-    # how dark it gets. Note it is NOT always below the magnitude: just outside the
-    # umbral limit the Moon is angularly larger than the Sun, and the area covered runs
-    # slightly ahead of the covered fraction of the diameter.
+    # Obscuración = fracción del *área* del disco solar tapada, que es el número que se
+    # corresponde con cuánto oscurece. Ojo: NO siempre queda por debajo de la magnitud.
+    # Justo fuera del límite umbral la Luna es angularmente mayor que el Sol, y el área
+    # tapada va un pelo por delante de la fracción tapada del diámetro.
     obscuration = _overlap_fraction(rs_m, rm_m, sep_m)
 
     out = {

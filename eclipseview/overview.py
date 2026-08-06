@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-"""The Spain-wide overview report.
+"""El informe general de España.
 
-Spanish only, on purpose: this one is an essay about a specific country's terrain,
-not a template. The parameterised, translatable report is `report.render_place`.
+Sólo en español, a propósito: este es un ensayo sobre el terreno de un país concreto,
+no una plantilla. El informe parametrizado y traducible es `report.render_place`.
 
-Every figure is computed here and interpolated into the prose. Cloud statistics are
-the one exception and are rendered from `sources.CLIMATOLOGY` with the attribution
-attached, because we cannot derive them from ephemerides and elevation.
+Cada cifra se calcula aquí y se interpola en la prosa. La única excepción es la
+estadística de nubes, que se pinta desde `sources.CLIMATOLOGY` con su atribución
+pegada, porque no se puede deducir de las efemérides ni de la elevación.
 """
 import json
 import os
@@ -27,7 +27,7 @@ N = lambda v, d=0: i18n.number(LANG, v, d)           # noqa: E731
 
 
 def build(progress=None, zone_half_km=9.0, zone_n=13):
-    """Compute everything the overview needs. Returns a dict of results."""
+    """Calcula todo lo que necesita el informe general. Devuelve un dict de resultados."""
     origin = roster.LADDER_ORIGIN
     sites = {}
     total = len(roster.SITES)
@@ -42,8 +42,8 @@ def build(progress=None, zone_half_km=9.0, zone_n=13):
         row['zone'] = zone_stats(zl, zo, half_km=zh or zone_half_km, n=zone_n)
         sites[s['key']] = row
 
-    # Fail loudly: without the band-wide scan the headline silently renders em-dashes
-    # instead of figures, which looks like a design choice rather than missing data.
+    # Fallar a gritos: sin el barrido de toda la franja, el titular pinta rayas en vez
+    # de cifras y eso parece una decisión de diseño en lugar de un dato que falta.
     if not os.path.exists(SCAN_PKL):
         raise FileNotFoundError(
             f'Falta {SCAN_PKL}. El informe general necesita el barrido de la franja.\n'

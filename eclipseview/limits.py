@@ -1,9 +1,9 @@
-"""Exact northern/southern limits of the umbral path, by bisection on latitude.
+"""Límites norte y sur exactos de la franja umbral, por bisección en latitud.
 
-The interpolated 0.25 deg field is fine for ranking sites but its band edge is
-piecewise-linear, which shows up as visible faceting when drawn. Here the limit is
-solved with the real engine so the drawn ribbon and the quoted width are computed,
-not remembered.
+El campo interpolado de 0,25° vale para ordenar sitios, pero su borde de banda es
+lineal a trozos y eso se nota como facetas al dibujarlo. Aquí el límite se resuelve
+con el motor de verdad, para que la cinta dibujada y la anchura que se cita estén
+calculadas y no recordadas.
 """
 import json, multiprocessing as mp, os
 import numpy as np
@@ -21,7 +21,7 @@ def solve(lon):
     def total(la):
         return circumstances(float(la), float(lon), 0.0, coarse_step_s=120.0)['total']
 
-    # locate any latitude inside the umbra by scanning coarsely
+    # localizar cualquier latitud dentro de la umbra con un barrido grueso
     las = np.arange(37.0, 46.01, 0.25)
     inside = [la for la in las if total(la)]
     if not inside:
@@ -29,7 +29,7 @@ def solve(lon):
     mid = float(np.mean(inside))
 
     def edge(lo, hi):
-        """lo is inside, hi is outside; return the boundary latitude."""
+        """lo está dentro, hi está fuera; devuelve la latitud del límite."""
         for _ in range(16):
             m = 0.5 * (lo + hi)
             if total(m):
