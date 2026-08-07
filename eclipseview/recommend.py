@@ -15,6 +15,7 @@ Salida (points.json):
            navegador dibuje el panorama sin mandar un SVG por punto.
 """
 import json
+import math
 import os
 import pickle
 
@@ -39,7 +40,29 @@ AZIMUTHS = np.arange(AZ_LO, AZ_HI + 1e-9, AZ_STEP)
 
 MIN_CLEAR = 2.0        # recomendar exige margen de verdad, no que salga positivo
 SEP_KM = 14.0          # separación dentro de la franja; ~1100 celdas sobre la banda
+SEP_KM_PARTIAL = 25.0  # fuera de la franja las celdas son más gruesas
 MAX_POINTS = 700
+
+# Por encima de este margen da igual cuánto más haya: 8° son quince veces el diámetro
+# del Sol y nadie nota la diferencia entre eso y 20°. El score lo recorta aquí, y eso
+# tiene una consecuencia que hay que mirar de frente: en el 27 % de los puntos el
+# criterio satura y deja de desempatar, así que quien decide pasa a ser la geometría
+# pura. `rescue.py` usa este mismo tope para saber dónde puede cambiar un punto por
+# otro sin perder nada.
+CLEAR_SATURATION = 8.0
+
+
+def cell_key(lat, lon, total, sep_km=SEP_KM, sep_km_partial=SEP_KM_PARTIAL):
+    """La celda de la rejilla en la que cae un punto. Una sola definición.
+
+    La tenían copiada `select()` y el rescate de accesos; si se separan, el rescate
+    busca alternativas en una celda que no es la del punto que quiere sustituir y no
+    encuentra nada, o peor, encuentra a cien kilómetros.
+    """
+    cell_km = sep_km if total else sep_km_partial
+    c = cell_km / 111.2
+    return (bool(total), int(lat / c),
+            int(lon / (c / np.cos(np.radians(lat)))))
 
 
 def select(scan_path=None, min_clear=MIN_CLEAR, sep_km=SEP_KM,
@@ -62,16 +85,13 @@ def select(scan_path=None, min_clear=MIN_CLEAR, sep_km=SEP_KM,
 
     ok = clear >= min_clear
     idx = np.where(ok)[0]
-    score = (np.minimum(clear[idx], 8.0) + dur[idx] / 20.0
+    score = (np.minimum(clear[idx], CLEAR_SATURATION) + dur[idx] / 20.0
              + np.minimum(alt[idx], 12) * 0.5)
 
     best = {}
     for pos, i in enumerate(idx):
         total = dur[i] >= 1.0
-        cell_km = sep_km if total else sep_km_partial
-        c = cell_km / 111.2
-        key = (bool(total), int(lat[i] / c),
-               int(lon[i] / (c / np.cos(np.radians(lat[i])))))
+        key = cell_key(lat[i], lon[i], total, sep_km, sep_km_partial)
         cur = best.get(key)
         if cur is None or score[pos] > cur[0]:
             best[key] = (score[pos], int(i))
@@ -91,6 +111,67 @@ def select(scan_path=None, min_clear=MIN_CLEAR, sep_km=SEP_KM,
     return d, picks
 
 
+def point_at(la, lo, event=None, index=0, prof=None, elev=None):
+    """Un punto publicable, con su horizonte fino a 30 m y su geometría.
+
+    Está fuera de `build()` porque el rescate de accesos y el recálculo de geometría
+    también fabrican puntos, y tres copias de esto se separan a la primera: bastaría
+    con que una redondease distinto para que el mismo sitio saliera con dos cifras
+    según por dónde hubiera entrado.
+
+    Con `prof` se reutiliza el perfil del horizonte de una pasada anterior en vez de
+    volver a trazarlo. El terreno no se mueve, y trazarlo son ~40 min de CPU para el
+    conjunto entero: recalcular la geometría con un radio lunar nuevo no tiene por qué
+    pagarlos.
+    """
+    ev = event or events.DEFAULT
+    e = float(elev_fine(la, lo)[0]) if elev is None else float(elev)
+    c = circumstances(la, lo, e)
+    hz = (horizon_fine(la, lo, AZIMUTHS, obs_elev=e) if prof is None
+          else np.asarray(prof, dtype=float) / 100.0)
+
+    # Traza del Sol cada 10 min por la ventana dibujada, para que la pinte el navegador.
+    saz, _, salt, _ = sun_track(la, lo, e, _ts_utc(ev, -60), _ts_utc(ev, 75),
+                                step_s=600.0)
+    keep = (saz >= AZ_LO - 2) & (saz <= AZ_HI + 2)
+
+    total = bool(c['total'])
+    if total:
+        alt_ref, az_ref = c['c3_alt_app'], c['c3_az']
+        clear = min(c['c2_alt_app'] - float(np.interp(c['c2_az'], AZIMUTHS, hz)),
+                    c['c3_alt_app'] - float(np.interp(c['c3_az'], AZIMUTHS, hz)))
+    else:
+        alt_ref, az_ref = c['max_alt_app'], c['max_az']
+        clear = alt_ref - float(np.interp(az_ref, AZIMUTHS, hz))
+    horizon = float(np.interp(az_ref, AZIMUTHS, hz))
+
+    from .ephem import moon_offset
+    d_az, d_alt, r_sun, r_moon = moon_offset(la, lo, e, _ts_at(c['max_utc']))
+
+    # Redondear la obscuración de un parcial puede dejarla en 100,0 exactos, y entonces
+    # el dato se contradice con `total=False` antes incluso de pintarlo. Ahí se trunca:
+    # de las dos direcciones del redondeo, la de abajo es la que no promete de más.
+    pct = c['obscuration'] * 100
+    obsc = round(pct, 3) if total else min(round(pct, 3), math.floor(pct * 1000) / 1000)
+
+    return dict(
+        i=index, lat=round(la, 5), lon=round(lo, 5), elev=round(e),
+        total=total, dur=round(c['duration_s'], 1),
+        obsc=obsc,
+        alt=round(alt_ref, 2), az=round(az_ref, 2),
+        alt2=round(c['c2_alt_app'], 2) if total else round(alt_ref, 2),
+        hz=round(horizon, 2), clear=round(clear, 2),
+        t=_local(ev, c['max_utc']),
+        t2=_local(ev, c['c2_utc'], seconds=True) if total else None,
+        t3=_local(ev, c['c3_utc'], seconds=True) if total else None,
+        # el perfil en centésimas de grado mantiene pequeño lo que se descarga
+        prof=[int(round(v * 100)) for v in hz],
+        sun=[[round(float(a), 2), round(float(v), 2)]
+             for a, v in zip(saz[keep], salt[keep])],
+        moon=[round(d_az, 4), round(d_alt, 4), round(r_sun, 4), round(r_moon, 4)],
+    )
+
+
 def build(out_path=None, progress=None, geocode=True, event=None,
           check_obstacles=True):
     ev = event or events.DEFAULT
@@ -103,49 +184,7 @@ def build(out_path=None, progress=None, geocode=True, event=None,
     for k, i in enumerate(picks, 1):
         if progress and k % 10 == 0:
             progress(k, n, 'calculando horizontes')
-        la, lo = float(lat[i]), float(lon[i])
-        e = float(elev_fine(la, lo)[0])
-        c = circumstances(la, lo, e)
-        hz = horizon_fine(la, lo, AZIMUTHS, obs_elev=e)
-
-        # Traza del Sol cada 10 min por la ventana dibujada, para que la pinte el
-        # navegador.
-        t0 = _ts_utc(ev, -60)
-        t1 = _ts_utc(ev, 75)
-        saz, _, salt, _ = sun_track(la, lo, e, t0, t1, step_s=600.0)
-        keep = (saz >= AZ_LO - 2) & (saz <= AZ_HI + 2)
-
-        total = bool(c['total'])
-        if total:
-            alt_ref, az_ref = c['c3_alt_app'], c['c3_az']
-            clear = min(c['c2_alt_app'] - float(np.interp(c['c2_az'], AZIMUTHS, hz)),
-                        c['c3_alt_app'] - float(np.interp(c['c3_az'], AZIMUTHS, hz)))
-        else:
-            alt_ref, az_ref = c['max_alt_app'], c['max_az']
-            clear = alt_ref - float(np.interp(az_ref, AZIMUTHS, hz))
-        horizon = float(np.interp(az_ref, AZIMUTHS, hz))
-
-        from .ephem import moon_offset
-        iso = c['max_utc']
-        tmax = _ts_at(iso)
-        d_az, d_alt, r_sun, r_moon = moon_offset(la, lo, e, tmax)
-
-        points.append(dict(
-            i=k, lat=round(la, 5), lon=round(lo, 5), elev=round(e),
-            total=total, dur=round(c['duration_s'], 1),
-            obsc=round(c['obscuration'] * 100, 3),
-            alt=round(alt_ref, 2), az=round(az_ref, 2),
-            alt2=round(c['c2_alt_app'], 2) if total else round(alt_ref, 2),
-            hz=round(horizon, 2), clear=round(clear, 2),
-            t=_local(ev, c['max_utc']),
-            t2=_local(ev, c['c2_utc']) if total else None,
-            t3=_local(ev, c['c3_utc']) if total else None,
-            # el perfil en centésimas de grado mantiene pequeño lo que se descarga
-            prof=[int(round(v * 100)) for v in hz],
-            sun=[[round(float(a), 2), round(float(v), 2)]
-                 for a, v in zip(saz[keep], salt[keep])],
-            moon=[round(d_az, 4), round(d_alt, 4), round(r_sun, 4), round(r_moon, 4)],
-        ))
+        points.append(point_at(float(lat[i]), float(lon[i]), ev, index=k))
 
     # Checkpoint antes de tocar nada externo. Los horizontes cuestan ~40 min de CPU y
     # no se pueden perder porque un servicio ajeno esté caído.
@@ -369,9 +408,19 @@ def _ts_at(iso):
                    int(iso[11:13]), int(iso[14:16]), float(iso[17:19]))
 
 
-def _local(ev, iso):
+def _local(ev, iso, seconds=False):
+    """Hora local del evento. Con `seconds`, hasta el segundo.
+
+    Los contactos LLEVAN segundos y el instante del máximo no. No es una inconsistencia:
+    C2 y C3 acotan un intervalo que dura alrededor de un minuto, así que a resolución de
+    minuto la ficha llegaba a decir «totalidad 58 s, de 20:28 a 20:28», que se lee como
+    un fallo del cálculo. El máximo es un instante suelto y ahí el segundo sobra.
+    """
     h = (int(iso[11:13]) + int(ev.tz_offset_h)) % 24
-    return f'{h:02d}:{iso[14:16]}'
+    if not seconds:
+        return f'{h:02d}:{iso[14:16]}'
+    # el mismo corte que usa _ts_at: skyfield cierra el ISO con una «Z»
+    return f'{h:02d}:{iso[14:16]}:{int(float(iso[17:19])):02d}'
 
 
 if __name__ == '__main__':

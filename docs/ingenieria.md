@@ -29,6 +29,7 @@ eclipseview/
   sources.py    datos externos y valores de referencia, con cita
   verify.py     comprobaciones; alimentan tests E informes
   events.py     el evento parametrizado
+  rescue.py     cambia un mirador mal comunicado por otro igual de bueno
 ```
 
 ## Trampas que ya costaron caro (no las repitas)
@@ -53,6 +54,26 @@ eclipseview/
    devuelve 429 y «Connection refused». `healthy_endpoints()` devuelve lista vacía si no
    contesta nadie, y los scripts abortan con código 2 en vez de fabricar fallos: una
    comprobación que nunca puede decir «no» no comprueba nada.
+9. **El intervalo por defecto de Overpass (6 s) NO sirve para una tanda.** `night.sh`
+   exporta `OVERPASS_MIN_INTERVAL=60` y por eso funciona; cualquier script nuevo que
+   consulte en lote y se olvide de exportarlo se come un 429 a los ~75 puntos. Pasó
+   con `rescue.sh` el 2026-08-06, sabiendo la trampa y sin aplicar la mitigación. Si
+   un script hace lotes contra Overpass, lo primero que tiene que llevar es el
+   intervalo.
+10. **Un criterio que satura deja de desempatar, y no se nota.** El score de `select()`
+   recorta el margen en `CLEAR_SATURATION` (8°, quince veces el diámetro del Sol). Por
+   encima de ahí, quien decide es la geometría pura — y como el acceso se consulta a
+   OSM *después* de seleccionar, la selección no podía preferir un sitio al que se
+   llega aunque lo tuviera al lado. Salían 880 de 1.456 puntos con acceso pobre y la
+   herramienta parecía funcionar perfectamente. Lo arregla `rescue.py`, sin rehacer la
+   selección entera: cambia sólo donde satura Y el acceso es malo, y sólo por
+   candidatos que también saturan.
+11. **Un punto que se mueve NO se lleva su topónimo.** La celda mide hasta 25 km, así
+   que el sustituto puede caer en otro municipio. Heredar el «en el término de X» es
+   una mentira que ningún test de geometría puede ver.
+12. **Python redondea las mitades a la par y `toFixed` hacia arriba.** Con 99,25 % el
+   informe decía 99,2 % y la web 99,3 % del mismo punto. `i18n.number` redondea ahora
+   hacia arriba usando el valor binario exacto, que es sobre el que opera el navegador.
 
 ## Antes de dar nada por bueno
 ```bash

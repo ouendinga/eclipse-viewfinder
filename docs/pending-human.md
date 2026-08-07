@@ -21,11 +21,25 @@ Actualizado: 2026-08-06
       200. Y sus 6 vulnerabilidades de dependencias, resueltas en otra conversación
       (`npm audit --omit=dev` da 0).
 
-- [ ] **Averiguar si los 50.000 eventos/mes del plan Hobby son por proyecto o por cuenta.**
-      Hay **cinco** proyectos con analítica en la cuenta (`eclipse-viewfinder`,
-      `alvarosolis`, `kynex-web`, `kynex-construccion`, `folio-doctor`). Si el límite es
-      de cuenta, un pico del eclipse se come la cuota de todos. **Sin verificar**: el dato
-      de 50.000 está comprobado en la documentación, el reparto no.
+- [x] **Los 50.000 eventos/mes: la pregunta era irrelevante, medido el 2026-08-06.**
+      No se puede resolver desde la API —el endpoint de uso agregado responde que es
+      sólo para Pro/Enterprise— pero da igual, porque el consumo real está a tres
+      órdenes de magnitud del tope:
+
+      | proyecto | páginas vistas |
+      |---|---:|
+      | `eclipse-viewfinder` | 20 |
+      | `alvarosolis` | 7 |
+      | `kynex-web`, `kynex-construccion`, `folio-doctor` | analítica **no activada** |
+
+      Aun suponiendo lo peor (cuota compartida de cuenta), 27 eventos contra 50.000
+      dejan sitio para unas 1.800 veces el tráfico actual. Deja de ser una decisión.
+
+- [ ] **Los otros tres proyectos NO tienen la analítica activa**, aunque en el listado
+      de proyectos aparezca el registro `webAnalytics`. La API responde
+      `web_analytics_not_enabled`. Es el mismo tropiezo de siempre: hace falta pulsar
+      Enable en el panel **y volver a desplegar**. Si se quiere medirlos, hay que
+      redesplegarlos; si no, no hay nada que hacer.
 
 - [ ] **¿Registrar las localidades buscadas?** Requiere Vercel Pro (20 $/mes) o el truco
       de leer la query string (`?n=Malgrat+de+Mar`), que está **sin verificar**. Además

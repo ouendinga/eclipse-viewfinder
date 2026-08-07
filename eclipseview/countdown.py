@@ -10,17 +10,29 @@ navegador hace la resta. Así vale igual desde Canarias que desde Berlín, que e
 una cuenta atrás escrita en hora peninsular engañaría.
 """
 
+import datetime
+
 from . import events
 
 
-def _utc_iso(ev, hhmm):
-    """'20:26' en hora local del evento -> instante UTC en ISO, para el navegador."""
-    h, m = (int(x) for x in hhmm.split(':'))
-    total = h * 60 + m - int(round(ev.tz_offset_h * 60))
-    dia = ev.iso_date
-    if total < 0:                       # sólo puede pasar con husos muy al este
-        total += 1440
-    return f'{dia}T{total // 60:02d}:{total % 60:02d}:00Z'
+def _utc_iso(ev, hora_local):
+    """Hora local del evento -> instante UTC en ISO, para el navegador.
+
+    Acepta 'HH:MM' y 'HH:MM:SS'. Los contactos del dataset llevan segundos desde que
+    una totalidad de 58 s llegó a mostrarse como «de 20:28 a 20:28»; desempaquetar dos
+    trozos a ciegas hacía que la cuenta atrás reventara con el formato nuevo.
+    """
+    partes = [int(x) for x in hora_local.split(':')]
+    h, m = partes[0], partes[1]
+    s = partes[2] if len(partes) > 2 else 0
+    # Restar el huso puede cruzar la medianoche en los dos sentidos, y entonces cambia
+    # el DÍA. Antes se ajustaba la hora y se dejaba la fecha del evento, que para este
+    # eclipse da igual (es de tarde) pero le pondría al siguiente una cuenta atrás con
+    # 24 h de error sin avisar.
+    base = datetime.datetime.fromisoformat(ev.iso_date).replace(
+        hour=h, minute=m, second=s, tzinfo=datetime.timezone.utc)
+    utc = base - datetime.timedelta(hours=ev.tz_offset_h)
+    return utc.strftime('%Y-%m-%dT%H:%M:%SZ')
 
 
 CSS = """

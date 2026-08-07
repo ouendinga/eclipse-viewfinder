@@ -73,6 +73,27 @@ Lo calculado está bien; lo que falla es cómo se presenta y qué falta comproba
 - Aviso de que son puntos del terreno: hay que comprobar acceso y finca privada.
 
 
+## Estado al 2026-08-06
+
+**En producción**: https://eclipse.alvarosolis.dev — 1.456 miradores, con el perfil
+real del limbo lunar publicado y el aviso del filo visible en la ficha.
+
+Lo que cambió de fondo:
+
+- **El acceso ya no es sólo un dato que se enseña: puede cambiar qué punto se
+  recomienda.** La puntuación de `select()` recorta el margen en 8°, y por encima de
+  ese tope deja de desempatar. En el 27 % de los puntos satura, y como el acceso se
+  consultaba *después* de seleccionar, la selección no podía preferir un sitio al que
+  se llega. Resultado medido: 880 de 1.456 puntos con acceso pobre. `rescue.py` los
+  cambia por alternativas de su misma celda que también saturen, así que no se paga
+  calidad por comodidad.
+- **Tres familias de tests nuevas**: el rescate (que sólo pueda mejorar), la calidad
+  del dataset publicado (coherencia interna) y lo que se presenta (ejecutando con
+  `node` el JavaScript que se publica sobre los 1.456 puntos de verdad).
+- Esos tests encontraron tres defectos que nadie miraba: seis parciales guardados con
+  el 100,0 % tapado, 57 totalidades que decían «de 20:28 a 20:28» (una de 58 s), y una
+  discrepancia de redondeo entre el informe y la web en las mitades exactas.
+
 ## Estado al cerrar la sesión del 2026-08-05
 
 **En producción**: https://eclipse.alvarosolis.dev — 1.457 miradores, 28 tests verdes.
@@ -80,6 +101,43 @@ Lo calculado está bien; lo que falla es cómo se presenta y qué falta comproba
 Lo que quedó a medias de la sesión anterior está cerrado: el chequeo de accesibilidad
 terminó (875/1.457), y el sitio se reconstruyó, así que el perfil de acceso y las
 secciones «Aviso» y «Fuentes» **ya se ven en pantalla** por primera vez.
+
+## A dónde va esto (idea de 2026-08-06)
+
+**De «un eclipse» a «eventos astronómicos: dónde y cómo verlos», y que la web se
+entere sola.** El motor de aquí no sabe de eclipses: sabe decir si desde un punto
+concreto vas a poder ver algo que está en una dirección y a una altura del cielo. Eso
+vale igual para una lluvia de meteoros o para un eclipse de Luna.
+
+Ejemplos del tipo de evento que tendría que entrar solo:
+
+| cuándo | qué |
+|---|---|
+| agosto | impacto en la Luna de una etapa superior de un Falcon 9 |
+| 12-13 agosto | pico de las Perseidas, con Luna nueva |
+| 27-28 agosto | eclipse lunar parcial profundo |
+
+> Las fechas y las cifras de arriba vienen de una conversación, **no de una fuente**.
+> Antes de que ninguna llegue a la web hay que pasarlas por la regla del repo: o la
+> calcula el código, o está en `sources.py` con su cita.
+
+Lo que cambia respecto a hoy, por orden de dificultad:
+
+1. **El evento deja de ser una fecha con un campo precalculado.** `events.py` ya
+   parametriza, pero cada evento necesita su campo (`field.pkl`) y su región. Para una
+   lluvia de meteoros no hay franja de totalidad: lo que importa es el radiante, su
+   altura a lo largo de la noche y la fase de la Luna.
+2. **Qué se pregunta cambia con el evento.** Un eclipse solar pregunta por el margen
+   sobre el horizonte en un azimut. Las Perseidas preguntan por cielo oscuro y
+   despejado en general, así que entra la contaminación lumínica, que hoy no se usa.
+   Un eclipse lunar se ve desde medio planeta y casi no depende del sitio.
+3. **Mantenerse al día solo.** Un catálogo de efemérides del que tirar (los eclipses
+   se pueden *calcular* con DE421 sin depender de nadie; las lluvias de meteoros son
+   tabulares y estables; un impacto lunar de un cohete es una noticia y necesita
+   fuente). Lo automático es fácil de hacer y difícil de hacer **sin publicar una
+   cifra sin comprobar**, que es justo lo que este proyecto no se puede permitir.
+4. **El sitio pasa a tener varias páginas** y un índice por evento, en vez de una sola
+   página con un eclipse dentro.
 
 ## Objetivo total
 

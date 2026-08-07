@@ -65,6 +65,40 @@ desarrollo:
    diciendo 99,95 % y a la web 99,9 % del mismo punto, que es tan malo como el
    problema original.
 
+## Tres capas, no una
+
+Los tests del motor comprueban que la geometría es correcta. Eso no basta, porque los
+fallos que llegan al usuario suelen ser de las otras dos capas y cada número por
+separado parece razonable:
+
+| capa | fichero | qué caza |
+|---|---|---|
+| motor | `test_engine.py` | que el cálculo cuadre con el IGN y la NASA |
+| dato | `test_data_quality.py` | que el dataset publicado sea coherente consigo mismo |
+| lo que se enseña | `test_presentation.py` | que la ficha no pueda contradecirse |
+
+La capa del dato se ejecuta contra `data/points.json` **y** contra `site/points.json`,
+que es literalmente el fichero que descarga el navegador. Entre uno y otro hay un paso
+de filtrado, y desplegar el sitio construido con un dataset viejo es un fallo que no
+deja rastro en ningún sitio.
+
+La capa de presentación **ejecuta con `node` el JavaScript que se publica** sobre los
+1.456 puntos reales, no sobre casos inventados: los que rompen cosas son siempre los
+del filo, y esos no se le ocurren a nadie. Lo que fija:
+
+- un parcial nunca se lee como «100 %»;
+- la web y el informe dicen el mismo número del mismo punto;
+- los tres avisos del filo son excluyentes (nunca dos chapas a la vez);
+- el rango de duración contiene siempre las cifras de los dos modelos;
+- «asfalto a 40 m» sale de una vía asfaltada a 40 m, y un dato sin comprobar nunca se
+  pinta en verde;
+- la cuenta atrás apunta al instante que dice el dataset, no a una hora escrita a mano.
+
+Estas dos capas encontraron, la primera vez que se ejecutaron, tres defectos que
+llevaban tiempo publicados: seis parciales guardados con el 100,0 % tapado, 57
+totalidades que mostraban «de 20:28 a 20:28» (la más larga, de 58 s) y una discrepancia
+de redondeo entre Python y el navegador en las mitades exactas.
+
 ## Lo que sí se comprueba ya (y antes no)
 
 - **El perfil real del limbo lunar** (`limb.py`): topografía LOLA/LRO más la libración

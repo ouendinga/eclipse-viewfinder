@@ -9,6 +9,8 @@ en vez de pasar en silencio.
 El informe general de España es sólo en español a propósito: es un ensayo sobre el
 terreno de un país, no una plantilla. El que generaliza es el informe de *lugar*.
 """
+import decimal
+
 DEFAULT = 'es'
 
 STRINGS = {
@@ -143,9 +145,20 @@ def t(lang, key, **kw):
 
 
 def number(lang, value, decimals=2, sign=False):
-    """Spanish uses a decimal comma; English a point. Applies to every figure we
-    print, so a report never mixes conventions."""
-    s = f'{value:+.{decimals}f}' if sign else f'{value:.{decimals}f}'
+    """El español lleva coma decimal y el inglés punto. Pasa por aquí toda cifra que se
+    imprime, así que un informe no puede mezclar convenios.
+
+    Y redondea las mitades exactas HACIA ARRIBA, no a la par. No es una manía: el
+    buscador de la web formatea con `toFixed`, que redondea hacia arriba, mientras que
+    Python formatea a la par. Con 99,25 % el informe decía 99,2 % y la web 99,3 % del
+    mismo punto. Son seis puntos del dataset, pero un lector que compare las dos cifras
+    no tiene forma de saber cuál creer.
+    """
+    q = decimal.Decimal(1).scaleb(-decimals)
+    # Decimal(float) toma el valor binario EXACTO, que es sobre el que opera toFixed.
+    # Pasar por repr() daría 1,01 donde el navegador da 1,00.
+    v = decimal.Decimal(float(value)).quantize(q, rounding=decimal.ROUND_HALF_UP)
+    s = f'{v:+f}' if sign else f'{v:f}'
     return s.replace('.', ',') if (lang or DEFAULT).startswith('es') else s
 
 
