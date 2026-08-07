@@ -29,7 +29,7 @@ import math
 
 import numpy as np
 
-from . import obstacles, recommend
+from . import gazetteer, obstacles, recommend
 
 # Cuánto tiene que separarse un candidato del punto al que aspira a sustituir. Por
 # debajo de esto el corredor que se le consulta a OSM es casi el mismo, así que la
@@ -162,4 +162,40 @@ def better(original, candidato, saturation=None, dur_tol=DUR_TOLERANCE_S):
         return False                       # ni se regalan segundos de corona
     if net_clear(candidato) <= sat:
         return False                       # tiene que seguir saturando de verdad
+    if 'place' in candidato and not gazetteer.on_land(candidato['place']):
+        return False                       # sobre el mar el horizonte sale impecable
     return access_rank(candidato) > access_rank(original)
+
+
+def _coord(p):
+    return (round(p['lat'], 5), round(p['lon'], 5))
+
+
+def choose_swaps(points, finos, saturation=None):
+    """Qué cambio se hace en cada punto, sin que dos acaben en el mismo sitio.
+
+    Los candidatos salen de la celda, y una celda puede contener a varios puntos
+    publicados. Cada uno recibe entonces la MISMA lista de alternativas y, si nadie lo
+    impide, todos se quedan con la mejor: la primera pasada dejó cuatro puntos en la
+    misma coordenada de Silleda. Dos puntos idénticos ocupan dos huecos de la lista de
+    ocho y le quitan al usuario una alternativa de verdad.
+
+    Devuelve [(original, sustituto)] y reserva cada sitio en cuanto se asigna.
+    """
+    ocupadas = {_coord(p) for p in points}
+    por_id = {p['i']: p for p in points}
+    out = []
+    for pid, qs in finos.items():
+        orig = por_id.get(pid)
+        if orig is None:
+            continue
+        mejores = sorted((q for q in qs if better(orig, q, saturation)),
+                         key=access_rank, reverse=True)
+        for q in mejores:
+            if _coord(q) in ocupadas:
+                continue
+            ocupadas.discard(_coord(orig))   # el sitio que deja queda libre
+            ocupadas.add(_coord(q))
+            out.append((orig, q))
+            break
+    return out

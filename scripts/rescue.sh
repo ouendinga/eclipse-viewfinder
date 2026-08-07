@@ -68,15 +68,29 @@ if not finos:
     print('ninguno aguanta; el dataset se queda como está'); sys.exit(0)
 
 # --- paso 4: OSM, sólo para los supervivientes ---------------------------------------
-# El sondeo va primero: sin él, una caída de Overpass se ve como una barra avanzando y
-# un "OK" al final, con todos los candidatos descartados en silencio por falta de datos.
-eps = obstacles.healthy_endpoints(force=True)
-if not eps:
-    print('ABORTADO: ningún Overpass responde. No se toca el dataset.'); sys.exit(2)
-print(f'paso 4: {len(eps)} endpoints responden, una consulta cada '
-      f'{obstacles._min_interval():.0f} s', flush=True)
-
 plano = [q for qs in finos.values() for q in qs]
+
+# Cuántos hacen falta de verdad. Una pasada anterior puede haber dejado la respuesta
+# en la caché, y entonces Overpass no pinta nada: exigir que esté sano para releer un
+# fichero local convertía un reintento en un aborto.
+cache = obstacles._load()
+faltan = sum(1 for q in plano
+             if f"road2:{q['lat']:.4f},{q['lon']:.4f}" not in cache
+             or f"{q['lat']:.4f},{q['lon']:.4f},{q['az']:.0f}" not in cache)
+print(f'paso 4: {len(plano)} candidatos, {faltan} sin respuesta guardada', flush=True)
+
+if faltan:
+    # El sondeo va antes de pedir nada: sin él, una caída de Overpass se ve como una
+    # barra avanzando y un "OK" al final, con todos los candidatos descartados en
+    # silencio por falta de datos.
+    eps = obstacles.healthy_endpoints(force=True)
+    if not eps:
+        print('ABORTADO: ningún Overpass responde y faltan datos. No se toca el '
+              'dataset.'); sys.exit(2)
+    print(f'  {len(eps)} endpoints responden, una consulta cada '
+          f'{obstacles._min_interval():.0f} s', flush=True)
+else:
+    print('  todo en caché: no hace falta Overpass', flush=True)
 t0 = time.time()
 try:
     # árboles y edificios: la MISMA función que usa build(), no una copia
@@ -95,13 +109,10 @@ for q, via in zip(plano, vias):
         q['acc_ok'] = False
 
 # --- el cambio ------------------------------------------------------------------------
-por_id = {p['i']: p for p in P}
-cambios = []
-for pid, qs in finos.items():
-    orig = por_id[pid]
-    mejores = [q for q in qs if rescue.better(orig, q)]
-    if mejores:
-        cambios.append((orig, max(mejores, key=rescue.access_rank)))
+# La elección va en rescue.choose_swaps() y no aquí: tiene que reservar cada sitio para
+# que dos puntos de la misma celda no se queden con el mismo candidato, y eso se
+# comprueba con tests.
+cambios = rescue.choose_swaps(P, finos)
 
 print(f'\n{len(cambios)} puntos mejoran de acceso sin perder nada', flush=True)
 hechos = 0
@@ -111,10 +122,14 @@ for k, (orig, nuevo) in enumerate(cambios, 1):
     # tipo de mentira que este proyecto no puede permitirse. Se pide ANTES de tocar
     # nada: si el geocodificador falla justo en este punto, se deja como estaba en vez
     # de tirar la pasada entera por culpa de uno.
+    # No basta con que devuelva algo: tiene que confirmar TIERRA. Un reverse que sólo
+    # acierta el país («España») es la señal de que el punto cae sobre agua, y ese es
+    # exactamente el fallo que ya metió 26 puntos en el mar una vez. Con `if not
+    # nombre` se colaba, y check_invariants tiraba la pasada entera por culpa de uno.
     nombre = gazetteer.reverse(nuevo['lat'], nuevo['lon'])
-    if not nombre:
-        print(f'  sin topónimo para {nuevo["lat"]:.4f},{nuevo["lon"]:.4f}: '
-              f'se queda el original', flush=True)
+    if not gazetteer.on_land(nombre):
+        print(f'  {nuevo["lat"]:.4f},{nuevo["lon"]:.4f} no se confirma en tierra '
+              f'({nombre!r}): se queda el original', flush=True)
         continue
     idx = orig['i']
     orig.clear(); orig.update(nuevo)

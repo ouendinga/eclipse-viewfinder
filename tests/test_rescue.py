@@ -101,6 +101,20 @@ class TestBetterRefusesToDowngrade(unittest.TestCase):
                      **con_pista(1100))
         self.assertFalse(rescue.better(self.orig, cand))
 
+    def test_never_moves_a_point_onto_water(self):
+        """Sobre el mar el modelo de elevación vale 0 y el horizonte sale impecable, así
+        que un punto en el agua gana en margen y en acceso a la vez. Un reverse que sólo
+        acierta el país («España») es la señal. Pasó de verdad: un candidato en la ría de
+        Vigo llegó hasta el guardia final y tiró una pasada de dos horas."""
+        cand = punto(clear=20.0, clear_net=20.0, total=True, dur=61.0,
+                     place='España', **con_asfalto(20))
+        self.assertFalse(rescue.better(self.orig, cand))
+
+    def test_a_named_municipality_is_accepted(self):
+        cand = punto(clear=14.0, clear_net=14.0, total=True, dur=61.0,
+                     place='Lalín, Deza, Galicia', **con_asfalto(30))
+        self.assertTrue(rescue.better(self.orig, cand))
+
     def test_a_real_improvement_is_accepted(self):
         cand = punto(clear=14.0, clear_net=14.0, total=True, dur=61.0,
                      **con_asfalto(30))
@@ -112,6 +126,55 @@ class TestBetterRefusesToDowngrade(unittest.TestCase):
         cand = punto(clear=14.0, clear_net=14.0, total=True,
                      dur=60.0 - rescue.DUR_TOLERANCE_S + 0.1, **con_asfalto(30))
         self.assertTrue(rescue.better(self.orig, cand))
+
+
+class TestNoTwoPointsEndUpInTheSameSpot(unittest.TestCase):
+    """Los candidatos salen de la celda, y una celda puede tener varios puntos
+    publicados dentro. Sin reservar el sitio, todos se quedan con la mejor alternativa:
+    la primera pasada real dejó CUATRO puntos en la misma coordenada de Silleda. Dos
+    puntos idénticos ocupan dos huecos de la lista de ocho."""
+
+    def test_two_points_sharing_candidates_do_not_collide(self):
+        a = punto(i=1, lat=42.0, lon=-8.0, clear=14.0, clear_net=14.0,
+                  **con_pista(1100))
+        b = punto(i=2, lat=42.05, lon=-8.05, clear=14.0, clear_net=14.0,
+                  **con_pista(1100))
+        mejor = punto(i=0, lat=42.10, lon=-8.10, clear=15.0, clear_net=15.0,
+                      place='Silleda, Deza, Galicia', **con_asfalto(20))
+        segundo = punto(i=0, lat=42.20, lon=-8.20, clear=15.0, clear_net=15.0,
+                        place='Lalín, Deza, Galicia', **con_asfalto(60))
+        # los dos reciben la MISMA lista, como pasa de verdad
+        finos = {1: [dict(mejor), dict(segundo)], 2: [dict(mejor), dict(segundo)]}
+        cambios = rescue.choose_swaps([a, b], finos)
+        self.assertEqual(len(cambios), 2, 'los dos deberían mejorar')
+        destinos = [(q['lat'], q['lon']) for _, q in cambios]
+        self.assertEqual(len(destinos), len(set(destinos)),
+                         'dos puntos han acabado en la misma coordenada')
+
+    def test_a_candidate_on_an_existing_point_is_refused(self):
+        """Y tampoco puede mudarse encima de un punto que ya está publicado."""
+        a = punto(i=1, lat=42.0, lon=-8.0, clear=14.0, clear_net=14.0,
+                  **con_pista(1100))
+        ocupado = punto(i=2, lat=42.10, lon=-8.10, clear=14.0, clear_net=14.0,
+                        **con_asfalto(20))
+        encima = punto(i=0, lat=42.10, lon=-8.10, clear=15.0, clear_net=15.0,
+                       place='Silleda, Deza, Galicia', **con_asfalto(20))
+        cambios = rescue.choose_swaps([a, ocupado], {1: [encima]})
+        self.assertEqual(cambios, [], 'se ha mudado encima de otro punto')
+
+    def test_the_spot_it_leaves_becomes_free_again(self):
+        """Si A se va de X, otro puede ocupar X: reservarlo para siempre bloquearía
+        cambios buenos sin motivo."""
+        a = punto(i=1, lat=42.0, lon=-8.0, clear=14.0, clear_net=14.0,
+                  **con_pista(1100))
+        b = punto(i=2, lat=42.5, lon=-8.5, clear=14.0, clear_net=14.0,
+                  **con_pista(1100))
+        lejos = punto(i=0, lat=43.0, lon=-9.0, clear=15.0, clear_net=15.0,
+                      place='Dumbría, Fisterra, Galicia', **con_asfalto(20))
+        alsitio_de_a = punto(i=0, lat=42.0, lon=-8.0, clear=15.0, clear_net=15.0,
+                             place='Lalín, Deza, Galicia', **con_asfalto(20))
+        cambios = rescue.choose_swaps([a, b], {1: [lejos], 2: [alsitio_de_a]})
+        self.assertEqual(len(cambios), 2)
 
 
 class TestTheCellIsTheSameOneSelectUsed(unittest.TestCase):
