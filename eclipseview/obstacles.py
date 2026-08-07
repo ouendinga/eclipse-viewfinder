@@ -44,10 +44,14 @@ CORRIDOR_M = 2500.0      # how far ahead local clutter still matters at low Sun
 HALF_WIDTH_M = 90.0      # cuánto se desvía del rumbo algo y sigue estorbando
 EYE_H = 1.6
 
-# Alturas por defecto, conservadoras (metros). Van documentadas como suposiciones,
-# nunca como medidas.
+# Alturas por defecto (metros). NO son medidas ni citas: son suposiciones declaradas,
+# y por eso cada una viaja con `measured=False` hasta la ficha, que escribe «altura
+# estimada» en vez de «altura del mapa». Es la única forma de respetar la regla del
+# repo —ninguna cifra sin origen— cuando el origen no existe: OSM casi nunca etiqueta
+# la altura del arbolado, y suponer cero sería peor que suponer un pinar maduro,
+# porque un cero se lee como «aquí no hay nada».
 DEFAULT_HEIGHTS = {
-    'wood': 18.0,        # mature Iberian pine/oak canopy
+    'wood': 18.0,        # copa de pinar o robledal ibérico ya crecido
     'forest': 18.0,
     'scrub': 3.0,
     'orchard': 6.0,
@@ -260,7 +264,12 @@ def _query_one(url, bbox, timeout=90):
 
 
 def _height(tags):
-    """(height_m, measured) -- measured=False means we assumed a default."""
+    """(altura_m, medida). `medida=False` significa que la hemos supuesto.
+
+    La segunda cifra es tan importante como la primera: es la que hace que la ficha
+    escriba «altura estimada» en vez de «altura del mapa». Un 18 que se cuele como
+    medido convierte la única suposición del proyecto en un dato.
+    """
     for key in ('height', 'building:height'):
         v = tags.get(key)
         if v:

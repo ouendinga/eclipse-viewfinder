@@ -145,5 +145,37 @@ class TestSaturationIsOneNumber(unittest.TestCase):
         self.assertNotIn('8.0)', src, 'el tope no se escribe a mano en el score')
 
 
+class TestAnAssumedHeightIsNeverMeasured(unittest.TestCase):
+    """La altura del arbolado es lo ÚNICO que este proyecto se inventa: OSM casi nunca
+    la trae. Vale inventarla —suponer cero sería peor, porque un cero se lee como «aquí
+    no hay nada»— pero no vale presentarla como medida."""
+
+    def test_a_default_never_comes_back_as_measured(self):
+        from eclipseview import obstacles
+        for clave in ('wood', 'forest', 'scrub', 'orchard', 'vineyard'):
+            alto, medida = obstacles._height({'landuse': clave})
+            self.assertEqual(alto, obstacles.DEFAULT_HEIGHTS[clave])
+            self.assertFalse(medida, f'{clave}: valor por defecto marcado como medido')
+        alto, medida = obstacles._height({'building': 'yes'})
+        self.assertFalse(medida, 'edificio sin altura marcado como medido')
+
+    def test_a_real_tag_does_come_back_as_measured(self):
+        """Y al revés: una altura etiquetada de verdad no puede quedarse en estimada, o
+        la ficha estaría rebajando un dato bueno."""
+        from eclipseview import obstacles
+        self.assertEqual(obstacles._height({'height': '24'}), (24.0, True))
+        self.assertEqual(obstacles._height({'building:levels': '4'}),
+                         (4 * obstacles.LEVEL_HEIGHT_M, True))
+
+    def test_a_measurement_that_equals_the_default_is_still_a_measurement(self):
+        """3 m es el valor supuesto para el matorral y también una altura etiquetada
+        perfectamente posible. Distinguirlas por la cifra es imposible; por eso la
+        marca viaja aparte y este test existe."""
+        from eclipseview import obstacles
+        alto, medida = obstacles._height({'height': '3', 'landuse': 'scrub'})
+        self.assertEqual(alto, 3.0)
+        self.assertTrue(medida)
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

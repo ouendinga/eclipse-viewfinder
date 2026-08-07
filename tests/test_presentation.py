@@ -176,6 +176,24 @@ var out=PTS.map(function(p){
                 self.assertTrue(acc.get('drive') or acc.get('paved'),
                                 f'{p["place"]}: «{txt}» sin vía en los datos')
 
+    def test_the_card_says_estimated_when_it_is_estimated(self):
+        """Los 18 m de un pinar son una suposición, no un dato: OSM casi nunca etiqueta
+        la altura del arbolado. La ficha tiene que escribir «altura estimada», porque es
+        lo único que este proyecto se inventa y venderlo como medido sería lo peor que
+        podría hacer."""
+        js = 'function esc(s){return String(s==null?"":s);}\n'   # el real usa el DOM
+        js += extraer(['n', 'deg', 'obscTxt', 'why'])
+        js += ('\nvar out=PTS.map(function(p){return why(p, 10);});'
+               'console.log(JSON.stringify(out));')
+        textos = correr(js, self.puntos)
+        vistos = 0
+        for p, t in zip(self.puntos, textos):
+            if p.get('obs_ok') and p.get('obs', 0) > 0 and p.get('obs_what'):
+                esperado = 'altura del mapa' if p.get('obs_meas') else 'altura estimada'
+                self.assertIn(esperado, t, f'{p["place"]}')
+                vistos += 1
+        self.assertGreater(vistos, 0, 'ningún punto ejercita la frase del obstáculo')
+
     def test_an_unchecked_point_is_never_painted_as_good(self):
         """`acc_class` decide el color. Un dato que falta no puede salir en verde."""
         clases = self._mapa(['acc_class'], 'acc_class(p)')
